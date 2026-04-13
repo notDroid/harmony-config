@@ -1,0 +1,7 @@
+creation_rules:
+  - path_regex: infra/secrets/sanay-secrets-staging\.yaml$
+    encrypted_regex: ^(secrets)$
+    age: age1kvfwns08ldyhexhgx0vtl4fz6l4j795sf7xh5228353tn50an9tqrx7uzu
+  - path_regex: infra/secrets/wali-secrets-staging\.yaml$
+    encrypted_regex: ^(secrets)$
+    age: age14v7sn2jseh9g29uchreyn5gxlm0fy3qasdwvghwrq6ae4qsdv9hsk0p3yh

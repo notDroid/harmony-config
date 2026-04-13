@@ -1,0 +1,144 @@
+# ==========================================
+# Global Metadata
+# ==========================================
+project_name: "Harmony Chat"
+environment: "staging"
+log_level: "INFO"
+
+# ==========================================
+# 1. APPLICATION DOMAIN CONFIGURATION
+# ==========================================
+app:
+  mode: "development"
+    
+  feature_toggles:
+    use_redis_cache: true
+  auth:
+    algorithm: "HS256"
+    access_token_name: "access_token"
+    access_token_expire_minutes: 15
+    refresh_token_name: "refresh_token"
+    refresh_token_expire_days: 7
+    refresh_token_grace_period_sec: 2
+  domains:
+    chat:
+      max_users_per_operation: 50
+      default_pagination_limit: 50
+    user:
+      default_search_limit: 20
+  cache_ttls_seconds:
+    default: 300
+    membership: 300
+    chat_metadata: 600
+    user: 300
+
+  cdc_consumer:
+    max_poll_records: 1000
+    fetch_max_bytes: 52428800
+    session_timeout_ms: 10000
+    poll_timeout_ms: 1000
+
+# ==========================================
+# 2. WORKLOAD CONFIGURATION
+# ==========================================
+workloads:  
+  image:
+    tag: "latest"
+    pullPolicy: "Always"
+
+  api:
+    host: "api"
+    port: 8000
+    debug: false
+    autoscaling:
+      enabled: true
+      maxReplicas: 20
+
+  cdc_consumer:
+    name: "Harmony CDC Worker staging"
+    autoscaling:
+      enabled: true
+      maxReplicas: 20
+
+# ==========================================
+# 3. INFRASTRUCTURE & TOPOLOGY
+# ==========================================
+infra:
+  karpenter:
+    limits:
+      cpu: 1000
+      memory: 1000Gi
+  k8s:
+    storage_class: "gp3"
+  aws:
+    region: "us-east-1"
+  secrets:
+    manager_name: "harmony/staging/secrets"
+  vpc:
+    cidr: "10.0.0.0/16"
+    azs_count: 3
+  compute:
+    cluster_name: "harmony-staging-eks"
+    cluster_version: "1.35"
+
+  postgres:
+    sslmode: "require"
+    dbname: "harmony"
+    user: "harmony"
+    port: 5432
+    instance_class: "db.t4g.micro"
+    allocated_storage_gb: 20
+  redis:
+    port: 6379
+    db_index: 1
+    health_check_interval: 30
+    request_timeout_ms: 100
+    node_type: "cache.t4g.micro"
+  dynamodb:
+    scheme: "https"
+    host: "dynamodb.us-east-1.amazonaws.com"
+    port: 443
+    chat_history_table_name: "chat_history_staging" 
+  s3:
+    endpoint: "https://s3.us-east-1.amazonaws.com"
+    path_style: "false"
+    region: "us-east-1"
+    buckets:
+      automq_data: "harmony-chat-automq-data-staging-${AWS_ACCOUNT_ID}" 
+      automq_ops: "harmony-chat-automq-ops-staging-${AWS_ACCOUNT_ID}"
+
+  kafka:
+    controller_replica_count: 3
+    host: "automq-kafka"
+    port: 9092
+    cluster_id: "NjM1ZjYxNjYtNjM1Zi00YmU"
+    autoscaling:
+      enabled: true
+    producer:
+      retry_backoff_ms: 500
+    consumer_groups:
+      cdc_worker: "staging_cdc_consumer"
+      dynamodb_sink: "staging_dynamodb_sink"
+      centrifugo_consumer: "staging_centrifugo_consumer"
+    topics:
+      chat_messages: "staging_chat_messages"
+      user_events: "staging_user_events"
+      chat_events: "staging_chat_events"
+
+  conduit:
+    autoscaling:
+      enabled: true
+  redpanda_connect:
+    autoscaling:
+      enabled: true
+      
+  centrifugo:
+    host: "centrifugo"
+    port: 8000
+    allowed_origins: ["*"]
+    autoscaling:
+      enabled: true
+    chat:
+      presence_enabled: true
+      history_size: 100
+      history_ttl: "3600s"
