@@ -1,0 +1,46 @@
+version: '3'
+
+vars:
+  INFRA_CACHE_DIR: .cache/infra
+  MANIFEST_OUTPUT: dist/manifests.yaml
+  REGISTRY_URL: '{{.REGISTRY_URL | default "ghcr.io/notdroid/harmony-config-local:latest"}}'
+  K8S_ENV: 'local'
+
+tasks:
+  fetch-infra:
+    desc: "⬇️ Fetch the agnostic infra components from GitHub release"
+    cmds:
+      - mkdir -p .cache
+      - curl -sL https://github.com/notDroid/HarmonyChat/archive/refs/tags/v1.0.3.tar.gz | tar xz -C .cache
+      - rm -rf {{.INFRA_CACHE_DIR}}
+      - mv .cache/HarmonyChat-1.0.3/infra {{.INFRA_CACHE_DIR}}
+      - rm -rf .cache/HarmonyChat-1.0.3
+    status:
+      - test -d {{.INFRA_CACHE_DIR}}
+
+  template:
+    desc: "📄 Template Helmfile to standard Kubernetes manifests"
+    deps: [fetch-infra]
+    cmds:
+      - mkdir -p dist
+      # Run helmfile template from the config-repo root, but we need to tell helmfile where its root is
+      # or run it from the cache directory and pass absolute paths.
+      # The helmfile expects to be in infra/k8s so it can find environments/base/...
+      # We'll run it from inside the cached infra/k8s dir and pass the values files from our config-repo.
+      - |
+        cd {{.INFRA_CACHE_DIR}}/k8s && \
+        helmfile --environment {{.K8S_ENV}} \
+                 --state-values-file ../../../environments/{{.K8S_ENV}}/values.yaml \
+                 --state-values-file ../../../environments/{{.K8S_ENV}}/secrets.yaml \
+                 --skip-deps template > ../../../{{.MANIFEST_OUTPUT}}
+    sources:
+      - environments/{{.K8S_ENV}}/**/*
+    generates:
+      - "{{.MANIFEST_OUTPUT}}"
+
+  publish:
+    desc: "📦 Package and push rendered manifests as an OCI artifact using oras"
+    deps: [template]
+    cmds:
+      - echo "Pushing manifests to {{.REGISTRY_URL}}"
+      - oras push {{.REGISTRY_URL}} {{.MANIFEST_OUTPUT}}:application/vnd.kubernetes.manifest.yaml

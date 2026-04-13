@@ -1,0 +1,118 @@
+# ==========================================
+# Global Metadata
+# ==========================================
+project_name: "Harmony Chat"
+environment: "local" # [local, staging, production]
+log_level: "DEBUG"
+
+# ==========================================
+# 1. APPLICATION DOMAIN CONFIGURATION
+# ==========================================
+app:
+  mode: "development"
+  cdc_consumer:
+    max_poll_records: 500
+    fetch_max_bytes: 52428800 # 50 MB
+    session_timeout_ms: 10000 # 10 seconds
+    poll_timeout_ms: 1000 # 1 second
+
+  feature_toggles:
+    use_redis_cache: true
+
+  auth:
+    algorithm: "HS256"
+    access_token_name: "access_token"
+    access_token_expire_minutes: 15
+    refresh_token_name: "refresh_token"
+    refresh_token_expire_days: 7
+    refresh_token_grace_period_sec: 2
+
+  domains:
+    chat:
+      max_users_per_operation: 10
+      default_pagination_limit: 50
+    user:
+      default_search_limit: 10
+      
+  cache_ttls_seconds:
+    default: 300
+    membership: 300
+    chat_metadata: 600
+    user: 300
+
+# ==========================================
+# 2. WORKLOAD CONFIGURATION
+# ==========================================
+workloads:
+  image:
+    repository: "harmony-backend"
+    tag: "local"
+    pullPolicy: "Never"
+  api:
+    host: "api"
+    port: 8000
+    debug: true
+  cdc_consumer:
+    name: "Harmony CDC Worker"
+
+# ==========================================
+# 3. INFRASTRUCTURE & TOPOLOGY
+# ==========================================
+infra:
+  k8s:
+    storage_class: "standard"
+    
+  aws:
+    region: "us-east-1"
+
+  postgres:
+    sslmode: "disable"
+    host: "postgres"
+    port: 5432
+    dbname: "harmony"
+    user: "harmony"
+
+  redis:
+    host: "redis-master"
+    port: 6379
+    db_index: 1
+    health_check_interval: 30
+    request_timeout_ms: 100
+
+  dynamodb:
+    scheme: "http"
+    host: "dynamodb"
+    port: 8000
+    chat_history_table_name: "local_harmony_chat_history"
+
+  kafka:
+    host: "automq-kafka"
+    port: 9092
+    cluster_id: "NjM1ZjYxNjYtNjM1Zi00YmU"
+    producer:
+      retry_backoff_ms: 500
+    consumer_groups:
+      cdc_worker: "local_cdc_consumer"
+      dynamodb_sink: "local_dynamodb_sink"
+      centrifugo_consumer: "local_centrifugo_consumer"
+    topics:
+      chat_messages: "local_chat_messages"
+      user_events: "local_user_events"
+      chat_events: "local_chat_events"
+
+  s3:
+    endpoint: "http://minio:9000"
+    region: "us-east-1"
+    path_style: "true"
+    buckets:
+      automq_data: "automq-data-local"
+      automq_ops: "automq-ops-local"
+      
+  centrifugo:
+    host: "centrifugo"
+    port: 8000
+    allowed_origins: ["*"]
+    chat:
+      presence_enabled: true
+      history_size: 100
+      history_ttl: "3600s"

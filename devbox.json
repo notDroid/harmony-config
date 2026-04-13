@@ -1,0 +1,13 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.17.0/.schema/devbox.schema.json",
+  "packages": [
+    "go-task@latest",
+    "kubernetes-helm@latest",
+    "helmfile@latest",
+    "sops@latest",
+    "age@latest",
+    "terraform@latest",
+    "terragrunt@latest",
+    "oras@latest"
+  ]
+}
