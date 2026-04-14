@@ -3,7 +3,8 @@ version: '3'
 vars:
   INFRA_CACHE_DIR: .cache/infra
   MANIFEST_OUTPUT: dist/manifests.yaml
-  REGISTRY_URL: '{{.REGISTRY_URL | default "ghcr.io/notdroid/harmony-config-local:latest"}}'
+  REGISTRY_URL: '{{.REGISTRY_URL | default "oci://ghcr.io/notdroid"}}'
+  CHART_VERSION: '{{.CHART_VERSION | default "0.1.0"}}'
   K8S_ENV: '{{.K8S_ENV | default "local"}}'
   HELMFILE_ENV: '{{if eq .K8S_ENV "local"}}local{{else}}remote{{end}}'
 
@@ -33,15 +34,33 @@ tasks:
         helmfile --environment {{.HELMFILE_ENV}} \
                  --state-values-file ../../../environments/{{.K8S_ENV}}/values.yaml \
                  --state-values-file ../../../environments/{{.K8S_ENV}}/secrets.yaml \
-                 --skip-deps template --include-crds > ../../../{{.MANIFEST_OUTPUT}}
+                 template --include-crds > ../../../{{.MANIFEST_OUTPUT}}
     sources:
       - environments/{{.K8S_ENV}}/**/*
     generates:
       - "{{.MANIFEST_OUTPUT}}"
 
   publish:
-    desc: "📦 Package and push rendered manifests as an OCI artifact using oras"
+    desc: "📦 Package and push rendered manifests as an OCI Helm Chart"
     deps: [template]
     cmds:
-      - echo "Pushing manifests to {{.REGISTRY_URL}}"
-      - oras push {{.REGISTRY_URL}} {{.MANIFEST_OUTPUT}}:application/vnd.kubernetes.manifest.yaml
+      - mkdir -p dist/harmony-manifests/templates
+      - |
+        python3 -c "
+        import sys
+        with open('{{.MANIFEST_OUTPUT}}', 'r') as f:
+            chunks = f.read().split('\n---\n')
+            for i, chunk in enumerate(chunks):
+                with open(f'dist/harmony-manifests/templates/manifest-{i}.yaml', 'w') as out:
+                    out.write(chunk)
+        "
+      - |
+        cat <<EOF > dist/harmony-manifests/Chart.yaml
+        apiVersion: v2
+        name: harmony-manifests
+        version: {{.CHART_VERSION}}
+        description: Rendered manifests for HarmonyChat (Env {{.K8S_ENV}})
+        EOF
+      - helm package dist/harmony-manifests -d dist/
+      - echo "Pushing Helm chart to {{.REGISTRY_URL}}"
+      - helm push dist/harmony-manifests-{{.CHART_VERSION}}.tgz {{.REGISTRY_URL}}
