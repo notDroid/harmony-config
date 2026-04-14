@@ -3,7 +3,7 @@ include "root" {
 }
 
 terraform {
-  source = "git::https://github.com/notDroid/HarmonyChat.git//infra/terraform/compositions/remote?ref=v1.0.3"
+  source = "git::https://github.com/notDroid/HarmonyChat.git//infra/terraform/compositions/remote?ref=v1.0.5"
 }
 
 locals {

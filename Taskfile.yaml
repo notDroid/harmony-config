@@ -4,17 +4,18 @@ vars:
   INFRA_CACHE_DIR: .cache/infra
   MANIFEST_OUTPUT: dist/manifests.yaml
   REGISTRY_URL: '{{.REGISTRY_URL | default "ghcr.io/notdroid/harmony-config-local:latest"}}'
-  K8S_ENV: 'local'
+  K8S_ENV: '{{.K8S_ENV | default "local"}}'
+  HELMFILE_ENV: '{{if eq .K8S_ENV "local"}}local{{else}}remote{{end}}'
 
 tasks:
   fetch-infra:
     desc: "⬇️ Fetch the agnostic infra components from GitHub release"
     cmds:
       - mkdir -p .cache
-      - curl -sL https://github.com/notDroid/HarmonyChat/archive/refs/tags/v1.0.3.tar.gz | tar xz -C .cache
+      - curl -sL https://github.com/notDroid/HarmonyChat/archive/refs/tags/v1.0.5.tar.gz | tar xz -C .cache
       - rm -rf {{.INFRA_CACHE_DIR}}
-      - mv .cache/HarmonyChat-1.0.3/infra {{.INFRA_CACHE_DIR}}
-      - rm -rf .cache/HarmonyChat-1.0.3
+      - mv .cache/HarmonyChat-1.0.5/infra {{.INFRA_CACHE_DIR}}
+      - rm -rf .cache/HarmonyChat-1.0.5
     status:
       - test -d {{.INFRA_CACHE_DIR}}
 
@@ -29,10 +30,10 @@ tasks:
       # We'll run it from inside the cached infra/k8s dir and pass the values files from our config-repo.
       - |
         cd {{.INFRA_CACHE_DIR}}/k8s && \
-        helmfile --environment {{.K8S_ENV}} \
+        helmfile --environment {{.HELMFILE_ENV}} \
                  --state-values-file ../../../environments/{{.K8S_ENV}}/values.yaml \
                  --state-values-file ../../../environments/{{.K8S_ENV}}/secrets.yaml \
-                 --skip-deps template > ../../../{{.MANIFEST_OUTPUT}}
+                 --skip-deps template --include-crds > ../../../{{.MANIFEST_OUTPUT}}
     sources:
       - environments/{{.K8S_ENV}}/**/*
     generates:
