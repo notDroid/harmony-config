@@ -8,6 +8,7 @@
     "age@latest",
     "terraform@latest",
     "terragrunt@latest",
-    "oras@latest"
+    "oras@latest",
+    "yq@latest"
   ]
 }
