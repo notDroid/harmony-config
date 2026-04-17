@@ -1,0 +1,20 @@
+# project_name: harmony
+# This file centralizes configuration for the config-repo template.
+# Environment-specific overrides should still live in environments/
+project:
+  name: harmony
+  repo_url: https://github.com/notDroid/HarmonyChat
+
+# Infrastructure Source (Agnostic)
+infra:
+  version: "../app-repo/infra" # Use local repo for dev
+
+# OCI Registry Configuration
+registry:
+  url: "ghcr.io/notdroid" # Default registry
+  # For local testing, we can override this with ttl.sh or a local registry
+  local_url: "ttl.sh/harmony-local"
+
+# K8S Configuration
+cluster:
+  name: "harmony-local"

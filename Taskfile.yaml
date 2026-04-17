@@ -1,66 +1,96 @@
 version: '3'
 
 vars:
-  INFRA_CACHE_DIR: .cache/infra
-  MANIFEST_OUTPUT: dist/manifests.yaml
-  REGISTRY_URL: '{{.REGISTRY_URL | default "oci://ghcr.io/notdroid"}}'
-  CHART_VERSION: '{{.CHART_VERSION | default "0.1.0"}}'
+  PROJECT_NAME: '{{.PROJECT_NAME | default "harmony"}}'
+  INFRA_REPO_URL: '{{.INFRA_REPO_URL | default "https://github.com/notDroid/HarmonyChat"}}'
+  INFRA_VERSION:
+    sh: "grep 'version:' config.yaml | awk '{print $2}' | tr -d '\"' | head -n 1"
+  
   K8S_ENV: '{{.K8S_ENV | default "local"}}'
+  INFRA_CACHE_DIR: .cache/infra
+  MANIFEST_OUTPUT_DIR: dist/{{.K8S_ENV}}-manifests
+  
+  REGISTRY_BASE: '{{if eq .K8S_ENV "local"}}ttl.sh/{{.PROJECT_NAME}}-{{.K8S_ENV}}{{else}}ghcr.io/notdroid{{end}}'
+  CHART_NAME: '{{.PROJECT_NAME}}-manifests-{{.K8S_ENV}}'
+  CHART_VERSION: '{{.CHART_VERSION | default "0.1.4"}}'
+  
   HELMFILE_ENV: '{{if eq .K8S_ENV "local"}}local{{else}}remote{{end}}'
+  HELMFILE_VALUES: >-
+    {{if eq .K8S_ENV "local"}}
+    --state-values-file ../../../environments/local/values.yaml
+    --state-values-file ../../../environments/local/secrets.yaml
+    {{else}}
+    --state-values-file ../../../environments/{{.K8S_ENV}}/expanded-values.yaml.gotmpl
+    --state-values-file environments/{{.HELMFILE_ENV}}/values-override.yaml.gotmpl
+    {{end}}
 
 tasks:
-  fetch-infra:
-    desc: "⬇️ Fetch the agnostic infra components from GitHub release"
-    cmds:
-      - mkdir -p .cache
-      - curl -sL https://github.com/notDroid/HarmonyChat/archive/refs/tags/v1.0.5.tar.gz | tar xz -C .cache
-      - rm -rf {{.INFRA_CACHE_DIR}}
-      - mv .cache/HarmonyChat-1.0.5/infra {{.INFRA_CACHE_DIR}}
-      - rm -rf .cache/HarmonyChat-1.0.5
-    status:
-      - test -d {{.INFRA_CACHE_DIR}}
+  default:
+    silent: true
+    cmds: [task --list-all]
 
+  clean: { cmds: [rm -rf dist/ .cache/] }
+
+  # --- Infrastructure Source ---
+  fetch:
+    desc: "⬇️ Fetch agnostic infra components"
+    cmds: ["./scripts/fetch-infra.sh {{.INFRA_VERSION}} {{.INFRA_CACHE_DIR}} {{.INFRA_REPO_URL}}"]
+
+  # --- Manifests & OCI ---
   template:
-    desc: "📄 Template Helmfile to standard Kubernetes manifests"
-    deps: [fetch-infra]
+    desc: "📄 Template Helmfile to standard manifests"
+    deps: [fetch]
     cmds:
-      - mkdir -p dist
-      # Run helmfile template from the config-repo root, but we need to tell helmfile where its root is
-      # or run it from the cache directory and pass absolute paths.
-      # The helmfile expects to be in infra/k8s so it can find environments/base/...
-      # We'll run it from inside the cached infra/k8s dir and pass the values files from our config-repo.
+      - rm -rf {{.MANIFEST_OUTPUT_DIR}}
+      - mkdir -p {{.MANIFEST_OUTPUT_DIR}}
       - |
         cd {{.INFRA_CACHE_DIR}}/k8s && \
-        helmfile --environment {{.HELMFILE_ENV}} \
-                 --state-values-file ../../../environments/{{.K8S_ENV}}/values.yaml \
-                 --state-values-file ../../../environments/{{.K8S_ENV}}/secrets.yaml \
-                 template --include-crds > ../../../{{.MANIFEST_OUTPUT}}
-    sources:
-      - environments/{{.K8S_ENV}}/**/*
-    generates:
-      - "{{.MANIFEST_OUTPUT}}"
+        helmfile --environment {{.HELMFILE_ENV}} {{.HELMFILE_VALUES}} \
+                 template --include-crds --output-dir ../../../{{.MANIFEST_OUTPUT_DIR}}
 
   publish:
-    desc: "📦 Package and push rendered manifests as an OCI Helm Chart"
+    desc: "📦 Package and push OCI artifact"
     deps: [template]
+    cmds: ["./scripts/package-oci.sh {{.MANIFEST_OUTPUT_DIR}} {{.CHART_NAME}} {{.CHART_VERSION}} {{.REGISTRY_BASE}}"]
+
+  # --- K8S & ArgoCD ---
+  kind:up:
+    desc: "☸️  Create local cluster"
+    cmds: ["kind create cluster --config environments/local/kind-config.yaml --name {{.PROJECT_NAME}}"]
+    status: ["kind get clusters | grep {{.PROJECT_NAME}}"]
+
+  argocd:bootstrap:
+    desc: "🐙 Install ArgoCD and Namespaces"
     cmds:
-      - mkdir -p dist/harmony-manifests/templates
+      - kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+      - kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml --server-side --force-conflicts
+      - kubectl wait --for=condition=Available deployment/argocd-server -n argocd --timeout=300s
       - |
-        python3 -c "
-        import sys
-        with open('{{.MANIFEST_OUTPUT}}', 'r') as f:
-            chunks = f.read().split('\n---\n')
-            for i, chunk in enumerate(chunks):
-                with open(f'dist/harmony-manifests/templates/manifest-{i}.yaml', 'w') as out:
-                    out.write(chunk)
-        "
+        for ns in harmony monitoring; do
+          kubectl create namespace $ns --dry-run=client -o yaml | kubectl apply -f -
+        done
+
+  argocd:apply:
+    desc: "🐙 Apply ArgoCD Application"
+    cmds:
       - |
-        cat <<EOF > dist/harmony-manifests/Chart.yaml
-        apiVersion: v2
-        name: harmony-manifests
-        version: {{.CHART_VERSION}}
-        description: Rendered manifests for HarmonyChat (Env {{.K8S_ENV}})
-        EOF
-      - helm package dist/harmony-manifests -d dist/
-      - echo "Pushing Helm chart to {{.REGISTRY_URL}}"
-      - helm push dist/harmony-manifests-{{.CHART_VERSION}}.tgz {{.REGISTRY_URL}}
+        export PROJECT_NAME={{.PROJECT_NAME}}
+        export K8S_ENV={{.K8S_ENV}}
+        export REGISTRY_BASE={{.REGISTRY_BASE}}
+        export CHART_NAME={{.CHART_NAME}}
+        export CHART_VERSION={{.CHART_VERSION}}
+        envsubst < environments/local/argocd/application.yaml | kubectl apply -n argocd -f -
+
+  # --- E2E & Tests ---
+  test:e2e:
+    desc: "🚀 Full E2E: Cluster + ArgoCD + OCI + Deploy"
+    cmds:
+      - task: kind:up
+      - task: argocd:bootstrap
+      - "cd ../app-repo && task kind:load"
+      - task: publish
+      - task: argocd:apply
+      - echo "Waiting for ArgoCD health..."
+      - sleep 10
+      - kubectl wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application/{{.PROJECT_NAME}}-{{.K8S_ENV}} -n argocd
+      - echo "✅ E2E Success!"

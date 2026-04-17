@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ${PROJECT_NAME}-${K8S_ENV}
+spec:
+  project: default
+  source:
+    repoURL: oci://${REGISTRY_BASE}/${CHART_NAME}
+    path: .
+    targetRevision: ${CHART_VERSION}
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: harmony
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - ServerSideApply=true

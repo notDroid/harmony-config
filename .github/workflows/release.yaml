@@ -14,15 +14,23 @@ jobs:
       contents: read
       packages: write
       id-token: write
+    strategy:
+      matrix:
+        env: [staging]
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Devbox
         uses: jetify-com/devbox-install-action@v0.11.0
         with:
           enable-cache: true
+
+      - name: Setup ORAS
+        uses: oras-project/setup-oras@v4
+        with:
+          version: 1.2.0
 
       - name: Extract Version
         id: get_version
@@ -34,14 +42,12 @@ jobs:
           fi
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Render and Publish Manifests
+      - name: Render and Publish Manifests for ${{ matrix.env }}
         run: |
-          # Remove 'v' prefix for Helm Chart version
-          CHART_VER=${VERSION#v}
-          devbox run -- task publish K8S_ENV=local CHART_VERSION=$CHART_VER REGISTRY_URL="oci://ghcr.io/${{ github.repository_owner }}"
+          devbox run -- task publish K8S_ENV=${{ matrix.env }} ARTIFACT_VERSION=$VERSION REGISTRY_URL="ghcr.io/${{ github.repository_owner }}"
