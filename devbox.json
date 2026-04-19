@@ -9,6 +9,7 @@
     "terraform@latest",
     "terragrunt@latest",
     "oras@latest",
-    "yq@latest"
+    "yq@latest",
+    "uv@latest"
   ]
 }

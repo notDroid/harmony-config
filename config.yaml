@@ -5,8 +5,8 @@ project:
   name: harmony
   repo_url: https://github.com/notDroid/HarmonyChat
 
-# Infrastructure Source
-infra:
+# Infrastructure Source (K8s specifically)
+k8s:
   version: "v1.0.5"
 
 # OCI Registry Configuration

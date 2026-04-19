@@ -8,6 +8,7 @@ docker/config/
 # Ignore environment files
 .env.*
 !.env*j2
+!.env.example
 keys.txt
 
 # Helm / helmfile generated files or secrets

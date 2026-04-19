@@ -2,34 +2,36 @@ version: '3'
 
 dotenv: ['.env']
 
+env:
+  SOPS_AGE_KEY_FILE: "{{.ROOT_DIR}}/keys.txt"
+
 vars:
   PROJECT_NAME:
     sh: "yq '.project.name' config.yaml"
-  INFRA_REPO_URL:
+  K8S_REPO_URL:
     sh: "yq '.project.repo_url' config.yaml"
-  INFRA_VERSION:
-    sh: "yq '.infra.version' config.yaml"
+  K8S_VERSION:
+    sh: "yq '.k8s.version' config.yaml"
   REGISTRY_URL:
     sh: "yq '.registry.url' config.yaml"
   LOCAL_REGISTRY_URL:
     sh: "yq '.registry.local_url' config.yaml"
   
   K8S_ENV: '{{.K8S_ENV | default "local"}}'
-  INFRA_CACHE_DIR: .cache/infra
+  K8S_CACHE_DIR: .cache/k8s
   MANIFEST_OUTPUT_DIR: dist/{{.K8S_ENV}}-manifests
   
   REGISTRY_BASE: '{{if eq .K8S_ENV "local"}}{{.LOCAL_REGISTRY_URL}}{{else}}{{.REGISTRY_URL}}{{end}}'
   CHART_NAME: '{{.PROJECT_NAME}}-manifests-{{.K8S_ENV}}'
-  CHART_VERSION: '{{.CHART_VERSION | default "0.1.4"}}'
+  CHART_VERSION: '{{.CHART_VERSION | default "latest"}}'
   
   HELMFILE_ENV: '{{if eq .K8S_ENV "local"}}local{{else}}remote{{end}}'
-  HELMFILE_VALUES: >-
+  CONFIG_HELMFILE_VALUES: >-
     {{if eq .K8S_ENV "local"}}
-    --state-values-file ../../../environments/local/values.yaml
-    --state-values-file ../../../environments/local/secrets.yaml
+    --state-values-file ../../environments/local/values.yaml
+    --state-values-file ../../environments/local/secrets.yaml
     {{else}}
-    --state-values-file ../../../environments/{{.K8S_ENV}}/expanded-values.yaml.gotmpl
-    --state-values-file environments/{{.HELMFILE_ENV}}/values-override.yaml.gotmpl
+    --state-values-file ../../environments/{{.K8S_ENV}}/expanded-values.yaml.gotmpl
     {{end}}
 
 tasks:
@@ -37,56 +39,50 @@ tasks:
     silent: true
     cmds: [task --list-all]
 
-  setup:
-    desc: "🔧 Setup local developer environment"
-    cmds:
-      - |
-        if [ ! -f .env ]; then
-          cp .env.example .env
-          echo "✅ Created .env from .env.example"
-        else
-          echo "ℹ️  .env already exists, skipping."
-        fi
-
   clean:
     desc: "🧹 Clean dist and cache directories"
     cmds: [rm -rf dist/ .cache/]
 
-  # ==========================================
-  # ===          LOCAL E2E TASKS           ===
-  # ==========================================
+  # --------------------------------------------------------------------------
+  # 1. SECRETS
+  # --------------------------------------------------------------------------
 
-  local:up:
-    desc: "☸️  Full Local E2E: Cluster + ArgoCD + OCI + Deploy"
+  secrets:setup:
+    desc: "🔑 SECRETS: Configure .sops.yaml with new age key"
     cmds:
-      - task setup
-      - task local:cluster
-      - task local:argocd
-      - cd ../app-repo && task kind:load
-      - task infra:publish
-      - task local:deploy
-      - echo "Waiting for ArgoCD health..."
-      - sleep 10
-      - kubectl wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application/{{.PROJECT_NAME}}-{{.K8S_ENV}} -n argocd
-      - echo "✅ E2E Success!"
+      - uv run scripts/setup_sops.py
 
-  local:cluster:
+  secrets:generate:
+    desc: "🔐 SECRETS: Generate a new secrets.yaml file for the target K8S_ENV"
+    cmds:
+      - uv run scripts/generate_secrets.py {{.K8S_ENV}}
+
+  secrets:encrypt:
+    desc: "🔒 SOPS: Encrypt secrets.yaml in place"
+    cmds:
+      - sops -e -i environments/{{.K8S_ENV}}/secrets.yaml
+
+  secrets:decrypt:
+    desc: "🔓 SOPS: Decrypt secrets.yaml in place"
+    cmds:
+      - sops -d -i environments/{{.K8S_ENV}}/secrets.yaml
+
+  # --------------------------------------------------------------------------
+  # 2. LOCAL DEV
+  # --------------------------------------------------------------------------
+
+  kind:create:
     desc: "☸️  Create local cluster"
-    cmds: ["kind create cluster --config environments/local/kind-config.yaml --name {{.PROJECT_NAME}}"]
+    cmds: ["kind create cluster --config environments/{{.K8S_ENV}}/kind-config.yaml --name {{.PROJECT_NAME}}"]
     status: ["kind get clusters | grep {{.PROJECT_NAME}}"]
 
-  local:argocd:
+  argocd:install:
     desc: "🐙 Install ArgoCD and Namespaces"
     cmds:
-      - kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-      - kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml --server-side --force-conflicts
-      - kubectl wait --for=condition=Available deployment/argocd-server -n argocd --timeout=300s
-      - |
-        for ns in harmony monitoring; do
-          kubectl create namespace $ns --dry-run=client -o yaml | kubectl apply -f -
-        done
+      - kubectl create namespace argocd
+      - kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
-  local:deploy:
+  argocd:deploy:
     desc: "🐙 Apply ArgoCD Application"
     env:
       PROJECT_NAME: '{{.PROJECT_NAME}}'
@@ -95,16 +91,30 @@ tasks:
       CHART_NAME: '{{.CHART_NAME}}'
       CHART_VERSION: '{{.CHART_VERSION}}'
     cmds:
-      - envsubst < environments/local/argocd/application.yaml | kubectl apply -n argocd -f -
+      - envsubst < environments/{{.K8S_ENV}}/argocd/application.yaml.tmpl | kubectl apply -n argocd -f -
 
-  # ==========================================
-  # ===     INFRASTRUCTURE / OCI TASKS     ===
-  # ==========================================
+  kind:destroy:
+    desc: "🧨 Destroy local cluster"
+    cmds:
+      - kind delete cluster --name {{.PROJECT_NAME}}
+
+  kind:setup:
+    desc: "🚀 Full local setup: kind cluster + ArgoCD + deploy manifests"
+    cmds:
+      - task: kind:create
+      - task: argocd:install
+      - task: argocd:deploy
+
+  # --------------------------------------------------------------------------
+  # 3. INFRA
+  # --------------------------------------------------------------------------
 
   infra:fetch:
-    desc: "⬇️ Fetch agnostic infra components"
+    desc: "⬇️ Fetch agnostic k8s components"
+    env:
+      LOCAL_INFRA_PATH: '{{.LOCAL_INFRA_PATH}}'
     cmds: 
-      - ./scripts/fetch-infra.sh "{{.INFRA_VERSION}}" "{{.INFRA_CACHE_DIR}}" "{{.INFRA_REPO_URL}}"
+      - uv run scripts/fetch-k8s.py "{{.K8S_VERSION}}" "{{.K8S_CACHE_DIR}}" "{{.K8S_REPO_URL}}"
 
   infra:template:
     desc: "📄 Template Helmfile to standard manifests"
@@ -113,12 +123,12 @@ tasks:
       - rm -rf {{.MANIFEST_OUTPUT_DIR}}
       - mkdir -p {{.MANIFEST_OUTPUT_DIR}}
       - |
-        cd {{.INFRA_CACHE_DIR}}/k8s && \
-        helmfile --environment {{.HELMFILE_ENV}} {{.HELMFILE_VALUES}} \
-                 template --include-crds --output-dir ../../../{{.MANIFEST_OUTPUT_DIR}}
+        cd {{.K8S_CACHE_DIR}} && \
+        helmfile --environment {{.HELMFILE_ENV}} {{.CONFIG_HELMFILE_VALUES}} \
+                 template --include-crds --output-dir ../../{{.MANIFEST_OUTPUT_DIR}}
 
   infra:publish:
     desc: "📦 Package and push OCI artifact"
     deps: [infra:template]
     cmds: 
-      - ./scripts/package-oci.sh "{{.MANIFEST_OUTPUT_DIR}}" "{{.CHART_NAME}}" "{{.CHART_VERSION}}" "{{.REGISTRY_BASE}}"
+      - uv run scripts/package-oci.py "{{.MANIFEST_OUTPUT_DIR}}" "{{.CHART_NAME}}" "{{.CHART_VERSION}}" "{{.REGISTRY_BASE}}"
