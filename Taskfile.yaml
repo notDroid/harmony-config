@@ -23,7 +23,8 @@ vars:
   
   REGISTRY_BASE: '{{if eq .K8S_ENV "local"}}{{.LOCAL_REGISTRY_URL}}{{else}}{{.REGISTRY_URL}}{{end}}'
   CHART_NAME: '{{.PROJECT_NAME}}-manifests-{{.K8S_ENV}}'
-  CHART_VERSION: '{{.CHART_VERSION | default "latest"}}'
+  CHART_VERSION: '{{.CHART_VERSION | default "0.0.0-local"}}'
+  TARGET_REVISION: '{{.TARGET_REVISION | default ">=0.0.0-0"}}'
   
   HELMFILE_ENV: '{{if eq .K8S_ENV "local"}}local{{else}}remote{{end}}'
   CONFIG_HELMFILE_VALUES: >-

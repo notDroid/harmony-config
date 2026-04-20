@@ -7,7 +7,7 @@ spec:
   source:
     repoURL: oci://${REGISTRY_BASE}/${CHART_NAME}
     chart: ${CHART_NAME}
-    targetRevision: ${CHART_VERSION}
+    targetRevision: ${TARGET_REVISION}
   destination:
     server: https://kubernetes.default.svc
     namespace: harmony
