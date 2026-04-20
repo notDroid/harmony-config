@@ -6,10 +6,8 @@ spec:
   project: default
   source:
     repoURL: oci://${REGISTRY_BASE}/${CHART_NAME}
-    path: .
+    chart: ${CHART_NAME}
     targetRevision: ${CHART_VERSION}
-    directory:
-      recurse: true
   destination:
     server: https://kubernetes.default.svc
     namespace: harmony
@@ -19,3 +17,4 @@ spec:
       selfHeal: true
     syncOptions:
     - ServerSideApply=true
+    - CreateNamespace=true

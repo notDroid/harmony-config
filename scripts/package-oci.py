@@ -10,51 +10,84 @@
 package-oci.py
 
 Purpose:
-This script packages a set of Kubernetes manifests (or a Helm chart) into a 
-gzipped tarball and pushes it as an OCI artifact to a container registry.
-This is particularly useful for storing configuration artifacts or GitOps 
-resources in a standard OCI registry format, which tools like Argo CD can consume.
+Packages rendered Kubernetes manifests into an OCI-compliant Helm chart 
+and pushes it to a container registry, so ArgoCD can natively consume it.
 """
 
 import os
-import tarfile
+import shutil
 from pathlib import Path
+from string import Template
 
 import typer
 import sh
 
-app = typer.Typer(help="Package and push Kubernetes manifests as an OCI artifact.")
+app = typer.Typer(help="Package and push rendered manifests as an OCI Helm chart.")
 
-def package_manifests(manifest_dir: Path, tar_file: Path, chart_name: str, chart_version: str):
-    """
-    Compresses the contents of 'manifest_dir' into a gzipped tarball.
-    """
-    typer.echo(f"Packaging {chart_name}:{chart_version}...")
-    
-    tar_file.parent.mkdir(parents=True, exist_ok=True)
-    
-    with tarfile.open(tar_file, "w:gz") as tar:
-        for item in manifest_dir.iterdir():
-            tar.add(item, arcname=item.name)
+class ChartPackager:
+    def __init__(self, manifest_dir: Path, chart_name: str, chart_version: str, registry_url: str):
+        self.manifest_dir = manifest_dir
+        self.chart_name = chart_name
+        self.chart_version = chart_version
+        self.registry_url = registry_url
+        self.script_dir = Path(__file__).parent.resolve()
+        self.template_dir = self.script_dir / "templates"
 
-def push_to_registry(image_ref: str, tar_file: Path):
-    """
-    Pushes the compressed tarball to an OCI registry using the 'oras' CLI tool.
-    Sets the media type required by systems like Argo CD for raw manifests.
-    """
-    typer.echo(f"Pushing {image_ref} to OCI registry...")
-    
-    media_type = "application/vnd.oci.image.layer.v1.tar+gzip"
-    target = f"{tar_file}:{media_type}"
-    
-    try:
-        sh.oras("push", image_ref, target, _fg=True)
-    except sh.ErrorReturnCode as e:
-        typer.secho(f"Error: oras push failed with return code {e.exit_code}.", fg=typer.colors.RED)
-        raise typer.Exit(code=e.exit_code)
-    except sh.CommandNotFound:
-        typer.secho("Error: The 'oras' CLI tool is not installed or not found in PATH.", fg=typer.colors.RED)
-        raise typer.Exit(code=1)
+    def _load_template(self, name: str) -> str:
+        template_file = self.template_dir / f"{name}.tmpl"
+        if not template_file.exists():
+            typer.secho(f"Error: Template '{name}' not found at {template_file}", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+        return template_file.read_text()
+
+    def restructure_as_chart(self):
+        """Restructures raw manifests into a Helm chart format."""
+        typer.echo(f"Restructuring manifests in {self.manifest_dir} into a Helm chart...")
+        
+        templates_dir = self.manifest_dir / "templates"
+        manifests_subdir = self.manifest_dir / "manifests"
+        
+        templates_dir.mkdir(exist_ok=True)
+        manifests_subdir.mkdir(exist_ok=True)
+
+        # Move existing manifests into the 'manifests' subdirectory
+        for item in self.manifest_dir.iterdir():
+            if item.name in ["templates", "manifests", "Chart.yaml"]:
+                continue
+            shutil.move(str(item), str(manifests_subdir / item.name))
+
+        # 1. Create the all.yaml template (Go template)
+        all_yaml_content = self._load_template("all.yaml")
+        (templates_dir / "all.yaml").write_text(all_yaml_content)
+
+        # 2. Create Chart.yaml using string Template
+        chart_yaml_tmpl = self._load_template("Chart.yaml")
+        chart_yaml_content = Template(chart_yaml_tmpl).substitute(
+            chart_name=self.chart_name,
+            chart_version=self.chart_version
+        )
+        (self.manifest_dir / "Chart.yaml").write_text(chart_yaml_content)
+
+    def package(self, destination: str = "dist/"):
+        """Runs 'helm package'."""
+        typer.echo(f"Packaging {self.chart_name}:{self.chart_version}...")
+        try:
+            sh.helm("package", str(self.manifest_dir), "--destination", destination)
+        except sh.ErrorReturnCode as e:
+            typer.secho(f"Error packaging chart: {e.stderr.decode()}", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+
+    def push(self, destination: str = "dist/"):
+        """Runs 'helm push' to the OCI registry."""
+        packaged_tar = Path(destination) / f"{self.chart_name}-{self.chart_version}.tgz"
+        image_ref = f"oci://{self.registry_url}"
+        
+        typer.echo(f"Pushing {packaged_tar.name} to {image_ref}...")
+        try:
+            sh.helm("push", str(packaged_tar), image_ref, _fg=True)
+        except sh.ErrorReturnCode as e:
+            typer.secho(f"Error: helm push failed for {image_ref}", fg=typer.colors.RED)
+            raise typer.Exit(code=e.exit_code)
 
 @app.command()
 def main(
@@ -63,25 +96,17 @@ def main(
     chart_version: str = typer.Argument(..., help="Version of the chart/artifact."),
     registry_url: str = typer.Argument(..., help="URL of the target OCI registry.")
 ):
-    """
-    Packages a directory into a tarball and pushes it to an OCI registry.
-    """
-    # Change current working directory to the config-repo root.
-    script_dir = Path(__file__).parent.resolve()
-    repo_root = script_dir.parent
-    os.chdir(repo_root)
-    
-    tar_file = Path(f"dist/{chart_name}-{chart_version}.tar.gz")
-    image_ref = f"{registry_url}/{chart_name}:{chart_version}"
-    
     if not manifest_dir.is_dir():
         typer.secho(f"Error: Manifest directory '{manifest_dir}' does not exist.", fg=typer.colors.RED)
         raise typer.Exit(code=1)
-        
-    package_manifests(manifest_dir, tar_file, chart_name, chart_version)
-    push_to_registry(image_ref, tar_file)
+
+    packager = ChartPackager(manifest_dir, chart_name, chart_version, registry_url)
     
-    typer.secho("✅ Successfully published OCI artifact.", fg=typer.colors.GREEN)
+    packager.restructure_as_chart()
+    packager.package()
+    packager.push()
+
+    typer.secho(f"✅ Successfully published {chart_name}:{chart_version}", fg=typer.colors.GREEN)
 
 if __name__ == "__main__":
     app()

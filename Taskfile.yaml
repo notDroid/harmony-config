@@ -93,6 +93,16 @@ tasks:
     cmds:
       - envsubst < environments/{{.K8S_ENV}}/argocd/application.yaml.tmpl | kubectl apply -n argocd -f -
 
+  argocd:repo:creds:
+    desc: "🐙 Configure ArgoCD with ghcr.io credentials using the gh CLI"
+    cmds:
+      - |
+        GITHUB_USERNAME=$(gh api user -q ".login" | tr '[:upper:]' '[:lower:]')
+        GITHUB_TOKEN=$(gh auth token)
+        export GITHUB_USERNAME
+        export GITHUB_TOKEN
+        envsubst < environments/{{.K8S_ENV}}/argocd/ghcr-creds.yaml.tmpl | kubectl apply -n argocd -f -
+
   kind:destroy:
     desc: "🧨 Destroy local cluster"
     cmds:
