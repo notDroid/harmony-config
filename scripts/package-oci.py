@@ -52,7 +52,7 @@ class ChartPackager:
 
         # Move existing manifests into the 'manifests' subdirectory
         for item in self.manifest_dir.iterdir():
-            if item.name in ["templates", "manifests", "Chart.yaml"]:
+            if item.name in ["templates", "manifests", "Chart.yaml", "releases.json"]:
                 continue
             shutil.move(str(item), str(manifests_subdir / item.name))
 

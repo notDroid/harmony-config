@@ -77,11 +77,26 @@ def inject_wave_to_file(file_path: Path, wave: str):
                 doc["metadata"] = {}
             
             # Ensure annotations exists
-            if "annotations" not in doc["metadata"] or doc["metadata"]["annotations"] is None:
-                doc["metadata"]["annotations"] = {}
+            annotations = doc["metadata"].get("annotations")
+            if annotations is None:
+                annotations = {}
+                doc["metadata"]["annotations"] = annotations
             
-            # Inject annotation
-            doc["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"] = wave
+            # Inject sync-wave
+            annotations["argocd.argoproj.io/sync-wave"] = wave
+            
+            # Map Helm hooks to ArgoCD hooks
+            helm_hook = annotations.get("helm.sh/hook", "")
+            if "post-install" in helm_hook or "post-upgrade" in helm_hook:
+                annotations["argocd.argoproj.io/hook"] = "PostSync"
+            
+            if "helm.sh/hook-delete-policy" in annotations:
+                del_policy = annotations["helm.sh/hook-delete-policy"]
+                if "hook-succeeded" in del_policy:
+                    annotations["argocd.argoproj.io/hook-delete-policy"] = "HookSucceeded"
+                elif "before-hook-creation" in del_policy:
+                    annotations["argocd.argoproj.io/hook-delete-policy"] = "BeforeHookCreation"
+            
             modified = True
 
         if modified:
