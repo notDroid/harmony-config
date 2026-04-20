@@ -23,8 +23,8 @@ vars:
   
   REGISTRY_BASE: '{{if eq .K8S_ENV "local"}}{{.LOCAL_REGISTRY_URL}}{{else}}{{.REGISTRY_URL}}{{end}}'
   CHART_NAME: '{{.PROJECT_NAME}}-manifests-{{.K8S_ENV}}'
-  CHART_VERSION: '{{.CHART_VERSION | default "0.0.0-local"}}'
-  TARGET_REVISION: '{{.TARGET_REVISION | default ">=0.0.0-0"}}'
+  CHART_VERSION: '{{.CHART_VERSION | default "0.0.1-local"}}'
+  TARGET_REVISION: '{{.TARGET_REVISION | default "*"}}'
   
   HELMFILE_ENV: '{{if eq .K8S_ENV "local"}}local{{else}}remote{{end}}'
   CONFIG_HELMFILE_VALUES: >-
@@ -91,8 +91,18 @@ tasks:
       REGISTRY_BASE: '{{.REGISTRY_BASE}}'
       CHART_NAME: '{{.CHART_NAME}}'
       CHART_VERSION: '{{.CHART_VERSION}}'
+      TARGET_REVISION: '{{.TARGET_REVISION}}'
     cmds:
       - envsubst < environments/{{.K8S_ENV}}/argocd/application.yaml.tmpl | kubectl apply -n argocd -f -
+
+  argocd:ui:
+    desc: "🐙 Open ArgoCD UI"
+    cmds:
+      - |
+        echo "Opening ArgoCD UI at http://localhost:8080"
+        echo "Login with admin / $(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
+        open "http://localhost:8080"
+        kubectl port-forward -n argocd service/argocd-server 8080:80
 
   argocd:repo:creds:
     desc: "🐙 Configure ArgoCD with ghcr.io credentials using the gh CLI"
@@ -104,10 +114,12 @@ tasks:
         export GITHUB_TOKEN
         envsubst < environments/{{.K8S_ENV}}/argocd/ghcr-creds.yaml.tmpl | kubectl apply -n argocd -f -
 
-  kind:destroy:
-    desc: "🧨 Destroy local cluster"
+  kind:setup:
+    desc: "☸️  Setup local Kind cluster with ArgoCD"
     cmds:
-      - kind delete cluster --name {{.PROJECT_NAME}}
+      - task: kind:create
+      - task: argocd:install
+      - task: argocd:repo:creds
 
   # --------------------------------------------------------------------------
   # 3. INFRA
