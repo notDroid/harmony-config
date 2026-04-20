@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'environments/**'
+      - 'config.yaml'
+      - 'Taskfile.yaml'
+      - 'scripts/**'
+      - '.github/workflows/release.yaml'
   release:
     types: [published]
   workflow_dispatch:
