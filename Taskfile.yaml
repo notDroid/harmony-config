@@ -130,6 +130,11 @@ tasks:
         cd {{.K8S_CACHE_DIR}} && \
         helmfile --environment {{.HELMFILE_ENV}} {{.CONFIG_HELMFILE_VALUES}} \
                  template --include-crds --output-dir ../../{{.MANIFEST_OUTPUT_DIR}}
+      - |
+        cd {{.K8S_CACHE_DIR}} && \
+        helmfile --environment {{.HELMFILE_ENV}} {{.CONFIG_HELMFILE_VALUES}} \
+                 list --output json > ../../{{.MANIFEST_OUTPUT_DIR}}/releases.json
+      - uv run scripts/inject_waves.py "{{.MANIFEST_OUTPUT_DIR}}"
 
   infra:publish:
     desc: "📦 Package and push OCI artifact"
