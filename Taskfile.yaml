@@ -98,13 +98,6 @@ tasks:
     cmds:
       - kind delete cluster --name {{.PROJECT_NAME}}
 
-  kind:setup:
-    desc: "🚀 Full local setup: kind cluster + ArgoCD + deploy manifests"
-    cmds:
-      - task: kind:create
-      - task: argocd:install
-      - task: argocd:deploy
-
   # --------------------------------------------------------------------------
   # 3. INFRA
   # --------------------------------------------------------------------------
