@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Task
         uses: arduino/setup-task@v2.0.0
@@ -62,4 +62,5 @@ jobs:
 
       - name: Render and Publish Manifests for ${{ matrix.env }}
         run: |
-          task infra:publish K8S_ENV=${{ matrix.env }} CHART_VERSION=$VERSION REGISTRY_BASE="ghcr.io/${{ github.repository_owner }}"
+          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          task infra:publish K8S_ENV=${{ matrix.env }} CHART_VERSION=$VERSION REGISTRY_BASE="ghcr.io/$REPO_OWNER"
