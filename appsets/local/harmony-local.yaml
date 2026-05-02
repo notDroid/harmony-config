@@ -165,7 +165,7 @@ spec:
       name: "local-{{ .name }}"
       namespace: argocd
       labels:
-        wave: "{{ .wave }}"
+        wave: "w{{ .wave }}"
       annotations:
         argocd.argoproj.io/sync-wave: "{{ .wave }}"
     spec:
