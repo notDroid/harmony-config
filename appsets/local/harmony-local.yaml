@@ -1,0 +1,196 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: harmony-local
+  namespace: argocd
+spec:
+  goTemplate: true
+  strategy:
+    type: RollingSync
+    rollingSync:
+      steps:
+        - matchExpressions:
+            - key: wave
+              operator: In
+              values:
+                - "-4"
+        - matchExpressions:
+            - key: wave
+              operator: In
+              values:
+                - "-3"
+        - matchExpressions:
+            - key: wave
+              operator: In
+              values:
+                - "-2"
+        - matchExpressions:
+            - key: wave
+              operator: In
+              values:
+                - "-1"
+        - matchExpressions:
+            - key: wave
+              operator: In
+              values:
+                - "0"
+  generators:
+    - list:
+        elements:
+          # ==========================================
+          # WAVE -4: Core Cluster Infrastructure
+          # ==========================================
+          - name: metrics-server
+            wave: "-4"
+            type: external
+            repoURL: https://kubernetes-sigs.github.io/metrics-server/
+            chart: metrics-server
+            targetRevision: "*"
+            namespace: kube-system
+
+          - name: kube-prometheus-stack
+            wave: "-4"
+            type: external
+            repoURL: https://prometheus-community.github.io/helm-charts
+            chart: kube-prometheus-stack
+            targetRevision: "*"
+            namespace: monitoring
+
+          # ==========================================
+          # WAVE -3: Secrets Management
+          # ==========================================
+          - name: secrets
+            wave: "-3"
+            type: local
+            chartPath: infra/k8s/charts/secrets
+            namespace: harmony
+
+          # ==========================================
+          # WAVE -2: Datastores & State
+          # ==========================================
+          - name: minio
+            wave: "-2"
+            type: external
+            repoURL: https://charts.min.io/
+            chart: minio
+            targetRevision: "*"
+            namespace: harmony
+
+          - name: postgresql
+            wave: "-2"
+            type: external
+            repoURL: https://charts.bitnami.com/bitnami
+            chart: postgresql
+            targetRevision: "*"
+            namespace: harmony
+
+          - name: redis
+            wave: "-2"
+            type: external
+            repoURL: https://charts.bitnami.com/bitnami
+            chart: redis
+            targetRevision: "*"
+            namespace: harmony
+
+          - name: dynamodb-local
+            wave: "-2"
+            type: local
+            chartPath: infra/k8s/charts/dynamodb-local
+            namespace: harmony
+
+          # ==========================================
+          # WAVE -1: Message Broker
+          # ==========================================
+          - name: automq
+            wave: "-1"
+            type: external
+            repoURL: registry-1.docker.io/bitnamicharts
+            chart: kafka
+            targetRevision: 31.5.0
+            namespace: harmony
+
+          # ==========================================
+          # WAVE 0: Application Services
+          # ==========================================
+          - name: backend
+            wave: "0"
+            type: local
+            chartPath: infra/k8s/charts/harmony
+            namespace: harmony
+
+          - name: consumer
+            wave: "0"
+            type: local
+            chartPath: infra/k8s/charts/harmony
+            namespace: harmony
+
+          - name: conduit-cdc
+            wave: "0"
+            type: local
+            chartPath: infra/k8s/charts/conduit
+            namespace: harmony
+
+          - name: centrifugo
+            wave: "0"
+            type: external
+            repoURL: https://centrifugal.github.io/helm-charts
+            chart: centrifugo
+            targetRevision: "*"
+            namespace: harmony
+
+          - name: redpanda-connect
+            wave: "0"
+            type: external
+            repoURL: https://charts.redpanda.com
+            chart: connect
+            targetRevision: 3.1.0
+            namespace: harmony
+
+          - name: kafbat-ui
+            wave: "0"
+            type: external
+            repoURL: https://kafbat.github.io/helm-charts
+            chart: kafka-ui
+            targetRevision: "*"
+            namespace: harmony
+
+          - name: init-job
+            wave: "0"
+            type: local
+            chartPath: infra/k8s/charts/init-job
+            namespace: harmony
+
+  template:
+    metadata:
+      name: "local-{{ .name }}"
+      namespace: argocd
+      labels:
+        wave: "{{ .wave }}"
+      annotations:
+        argocd.argoproj.io/sync-wave: "{{ .wave }}"
+    spec:
+      project: default
+      sources:
+        - repoURL: https://github.com/notDroid/harmony-config.git
+          targetRevision: HEAD
+          ref: values
+
+        - repoURL: '{{ if eq .type "local" }}https://github.com/notDroid/HarmonyChat.git{{ else }}{{ .repoURL }}{{ end }}'
+          targetRevision: '{{ if eq .type "local" }}HEAD{{ else }}{{ .targetRevision }}{{ end }}'
+          {{ if eq .type "local" }}path: '{{ .chartPath }}'{{ else }}chart: '{{ .chart }}'{{ end }}
+          helm:
+            releaseName: "{{ .name }}"
+            valueFiles:
+              - $values/environments/local/rendered-values/{{ .name }}.yaml
+
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{ .namespace }}"
+
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        automated:
+          prune: true
+          selfHeal: true
