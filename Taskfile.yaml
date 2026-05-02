@@ -58,7 +58,7 @@ tasks:
   infra:fetch:
     desc: "🚚 INFRA: Fetch k8s templates from app-repo"
     cmds:
-      - uv run scripts/fetch-k8s.py {{.VERSION}} {{.K8S_CACHE_DIR}}/k8s {{.REPO_URL}}
+      - uv run scripts/fetch-k8s.py "{{.REPO_URL}}@{{.VERSION}}" --cache-dir "{{.K8S_CACHE_DIR}}k8s" ${LOCAL_INFRA_PATH:+--local-path "$LOCAL_INFRA_PATH"}
 
   infra:render:
     desc: "📄 INFRA: Render environment .gotmpl files to rendered-values/"

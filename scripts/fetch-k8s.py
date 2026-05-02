@@ -2,20 +2,18 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#     "python-dotenv>=1.2.2",
 #     "requests>=2.31.0",
 #     "typer>=0.12.0",
 # ]
 # ///
 
-import os
 import shutil
 import tarfile
 from pathlib import Path
+from typing import Optional
 
 import requests
 import typer
-from dotenv import load_dotenv
 
 app = typer.Typer(help="Fetch Kubernetes infrastructure definitions.")
 
@@ -31,12 +29,8 @@ def _copy_local_infra(local_infra_path: Path, cache_dir: Path):
             
     (cache_dir / ".version").write_text("local\n")
 
-def _download_remote_infra(version: str, cache_dir: Path, repo_url: str):
+def _download_remote_infra(version: str, repo_url: str, cache_dir: Path):
     """Downloads and extracts remote Kubernetes infrastructure files to cache directory."""
-    if not version or not repo_url:
-        typer.secho("Error: VERSION and REPO_URL are required.", fg=typer.colors.RED)
-        raise typer.Exit(code=1)
-        
     typer.echo(f"Fetching k8s {version} from {repo_url}...")
     
     temp_tar = Path(".cache/k8s.tar.gz")
@@ -77,20 +71,25 @@ def _download_remote_infra(version: str, cache_dir: Path, repo_url: str):
 
 @app.command()
 def fetch_k8s(
-    version: str = typer.Argument(..., help="The version of the infrastructure to fetch."),
-    cache_dir: Path = typer.Argument(..., help="The directory to cache the fetched files in."),
-    repo_url: str = typer.Argument(..., help="The GitHub repository URL.")
+    source: str = typer.Argument(..., help="The repository URL and version (e.g., https://github.com/repo.git@v1.0.0)"),
+    cache_dir: Path = typer.Option(Path(".cache/k8s"), "--cache-dir", "-c", help="Directory to cache the fetched files in."),
+    local_path: Optional[Path] = typer.Option(None, "--local-path", "-l", help="Local path to override fetching.")
 ):
-    """Fetches the k8s directory from the specified repository or copies it from a local path."""
-    load_dotenv()
-    
-    local_infra_path_str = os.environ.get("LOCAL_INFRA_PATH")
-    local_path = Path(local_infra_path_str) if local_infra_path_str else None
-    
+    """Fetches the k8s directory from the specified source or copies it from a local path."""
     if local_path and local_path.is_dir():
         _copy_local_infra(local_path, cache_dir)
-    else:
-        _download_remote_infra(version, cache_dir, repo_url)
+        return
+
+    if "@" not in source:
+        typer.secho("Error: Source must be in the format <repo_url>@<version>.", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+        
+    repo_url, version = source.rsplit("@", 1)
+    if not repo_url or not version:
+        typer.secho("Error: Both repository URL and version are required in the source argument.", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+        
+    _download_remote_infra(version, repo_url, cache_dir)
 
 if __name__ == "__main__":
     app()

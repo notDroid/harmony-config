@@ -8,9 +8,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/notDroid/HarmonyChat.git
+    repoURL: https://github.com/notDroid/harmony-config.git
     targetRevision: HEAD
-    path: infra/k8s/appsets/local
+    path: appsets/local
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
