@@ -45,7 +45,7 @@ spec:
             type: external
             repoURL: https://kubernetes-sigs.github.io/metrics-server/
             chart: metrics-server
-            targetRevision: "*"
+            targetRevision: "3.13.0"
             namespace: kube-system
 
           - name: kube-prometheus-stack
@@ -53,7 +53,7 @@ spec:
             type: external
             repoURL: https://prometheus-community.github.io/helm-charts
             chart: kube-prometheus-stack
-            targetRevision: "*"
+            targetRevision: "84.5.0"
             namespace: monitoring
 
           # ==========================================
@@ -73,7 +73,7 @@ spec:
             type: external
             repoURL: https://charts.min.io/
             chart: minio
-            targetRevision: "*"
+            targetRevision: "8.0.10"
             namespace: harmony
 
           - name: postgresql
@@ -81,7 +81,7 @@ spec:
             type: external
             repoURL: https://charts.bitnami.com/bitnami
             chart: postgresql
-            targetRevision: "*"
+            targetRevision: "18.1.13"
             namespace: harmony
 
           - name: redis
@@ -89,7 +89,7 @@ spec:
             type: external
             repoURL: https://charts.bitnami.com/bitnami
             chart: redis
-            targetRevision: "*"
+            targetRevision: "25.4.1"
             namespace: harmony
 
           - name: dynamodb-local
@@ -104,9 +104,9 @@ spec:
           - name: automq
             wave: "-1"
             type: external
-            repoURL: registry-1.docker.io/bitnamicharts
+            repoURL: oci://registry-1.docker.io/bitnamicharts
             chart: kafka
-            targetRevision: 31.5.0
+            targetRevision: "32.4.3"
             namespace: harmony
 
           # ==========================================
@@ -135,7 +135,7 @@ spec:
             type: external
             repoURL: https://centrifugal.github.io/helm-charts
             chart: centrifugo
-            targetRevision: "*"
+            targetRevision: "13.0.0"
             namespace: harmony
 
           - name: redpanda-connect
@@ -143,7 +143,7 @@ spec:
             type: external
             repoURL: https://charts.redpanda.com
             chart: connect
-            targetRevision: 3.1.0
+            targetRevision: "3.1.0"
             namespace: harmony
 
           - name: kafbat-ui
@@ -151,7 +151,7 @@ spec:
             type: external
             repoURL: https://kafbat.github.io/helm-charts
             chart: kafka-ui
-            targetRevision: "*"
+            targetRevision: "1.6.4"
             namespace: harmony
 
           - name: init-job
@@ -165,9 +165,7 @@ spec:
       name: "local-{{ .name }}"
       namespace: argocd
       labels:
-        wave: "w{{ .wave }}"
-      annotations:
-        argocd.argoproj.io/sync-wave: "{{ .wave }}"
+        wave: "{{ .wave }}"
     spec:
       project: default
       sources:

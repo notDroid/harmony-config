@@ -76,7 +76,6 @@ tasks:
     cmds:
       - kubectl create namespace argocd || true
       - kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-      - kubectl wait --for=condition=available --timeout=600s deployment/argocd-server -n argocd
 
   argocd:bootstrap:
     desc: "🐙 ARGOCD: Apply local bootstrap Application"
