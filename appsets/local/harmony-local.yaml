@@ -177,7 +177,11 @@ spec:
 
         - repoURL: '{{ if eq .type "local" }}https://github.com/notDroid/HarmonyChat.git{{ else }}{{ .repoURL }}{{ end }}'
           targetRevision: '{{ if eq .type "local" }}HEAD{{ else }}{{ .targetRevision }}{{ end }}'
-          {{ if eq .type "local" }}path: '{{ .chartPath }}'{{ else }}chart: '{{ .chart }}'{{ end }}
+          {{- if eq .type "local" }}
+          path: '{{ .chartPath }}'
+          {{- else }}
+          chart: '{{ .chart }}'
+          {{- end }}
           helm:
             releaseName: "{{ .name }}"
             valueFiles:
