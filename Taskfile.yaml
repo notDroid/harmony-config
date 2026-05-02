@@ -76,6 +76,10 @@ tasks:
     cmds:
       - kubectl create namespace argocd || true
       - kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+      - kubectl rollout status deployment argocd-applicationset-controller -n argocd --timeout=120s
+      - kubectl patch configmap argocd-cmd-params-cm -n argocd --type merge -p '{"data":{"applicationsetcontroller.enable.progressive.syncs":"true"}}'
+      - kubectl rollout restart deployment argocd-applicationset-controller -n argocd
+      - kubectl rollout status deployment argocd-applicationset-controller -n argocd --timeout=120s
 
   argocd:bootstrap:
     desc: "🐙 ARGOCD: Apply local bootstrap Application"

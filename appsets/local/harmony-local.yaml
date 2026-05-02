@@ -73,7 +73,7 @@ spec:
             type: external
             repoURL: https://charts.min.io/
             chart: minio
-            targetRevision: "8.0.10"
+            targetRevision: "5.4.0"
             namespace: harmony
 
           - name: postgresql
@@ -106,7 +106,7 @@ spec:
             type: external
             repoURL: oci://registry-1.docker.io/bitnamicharts
             chart: kafka
-            targetRevision: "32.4.3"
+            targetRevision: "31.5.0"
             namespace: harmony
 
           # ==========================================
@@ -135,7 +135,7 @@ spec:
             type: external
             repoURL: https://centrifugal.github.io/helm-charts
             chart: centrifugo
-            targetRevision: "13.0.0"
+            targetRevision: "13.1.0"
             namespace: harmony
 
           - name: redpanda-connect
@@ -143,7 +143,7 @@ spec:
             type: external
             repoURL: https://charts.redpanda.com
             chart: connect
-            targetRevision: "3.1.0"
+            targetRevision: "3.2.5"
             namespace: harmony
 
           - name: kafbat-ui
