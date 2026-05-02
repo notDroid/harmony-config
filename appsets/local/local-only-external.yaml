@@ -6,28 +6,28 @@ metadata:
 spec:
   goTemplate: true
   generators:
-  - list:
-    elements:
-      - name: minio
-        wave: "-2"
-        repoURL: https://charts.min.io/
-        chart: minio
-        targetRevision: "*"
-        namespace: harmony
+    - list:
+        elements:
+          - name: minio
+            wave: "-2"
+            repoURL: https://charts.min.io/
+            chart: minio
+            targetRevision: "*"
+            namespace: harmony
 
-      - name: postgresql
-        wave: "-2"
-        repoURL: https://charts.bitnami.com/bitnami
-        chart: postgresql
-        targetRevision: "*"
-        namespace: harmony
+          - name: postgresql
+            wave: "-2"
+            repoURL: https://charts.bitnami.com/bitnami
+            chart: postgresql
+            targetRevision: "*"
+            namespace: harmony
 
-      - name: redis
-        wave: "-2"
-        repoURL: https://charts.bitnami.com/bitnami
-        chart: redis
-        targetRevision: "*"
-        namespace: harmony
+          - name: redis
+            wave: "-2"
+            repoURL: https://charts.bitnami.com/bitnami
+            chart: redis
+            targetRevision: "*"
+            namespace: harmony
   template:
     metadata:
       name: "local-{{ .name }}"

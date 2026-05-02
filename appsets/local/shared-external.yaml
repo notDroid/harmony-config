@@ -6,49 +6,49 @@ metadata:
 spec:
   goTemplate: true
   generators:
-  - list:
-    elements:
-      - name: metrics-server
-        wave: "-4"
-        repoURL: https://kubernetes-sigs.github.io/metrics-server/
-        chart: metrics-server
-        targetRevision: "*"
-        namespace: kube-system
+    - list:
+        elements:
+          - name: metrics-server
+            wave: "-4"
+            repoURL: https://kubernetes-sigs.github.io/metrics-server/
+            chart: metrics-server
+            targetRevision: "*"
+            namespace: kube-system
 
-      - name: kube-prometheus-stack
-        wave: "-4"
-        repoURL: https://prometheus-community.github.io/helm-charts
-        chart: kube-prometheus-stack
-        targetRevision: "*"
-        namespace: monitoring
+          - name: kube-prometheus-stack
+            wave: "-4"
+            repoURL: https://prometheus-community.github.io/helm-charts
+            chart: kube-prometheus-stack
+            targetRevision: "*"
+            namespace: monitoring
 
-      - name: automq
-        wave: "-1"
-        repoURL: registry-1.docker.io/bitnamicharts
-        chart: kafka
-        targetRevision: 31.5.0
-        namespace: harmony
+          - name: automq
+            wave: "-1"
+            repoURL: registry-1.docker.io/bitnamicharts
+            chart: kafka
+            targetRevision: 31.5.0
+            namespace: harmony
 
-      - name: centrifugo
-        wave: "0"
-        repoURL: https://centrifugal.github.io/helm-charts
-        chart: centrifugo
-        targetRevision: "*"
-        namespace: harmony
+          - name: centrifugo
+            wave: "0"
+            repoURL: https://centrifugal.github.io/helm-charts
+            chart: centrifugo
+            targetRevision: "*"
+            namespace: harmony
 
-      - name: redpanda-connect
-        wave: "0"
-        repoURL: https://charts.redpanda.com
-        chart: connect
-        targetRevision: 3.1.0
-        namespace: harmony
+          - name: redpanda-connect
+            wave: "0"
+            repoURL: https://charts.redpanda.com
+            chart: connect
+            targetRevision: 3.1.0
+            namespace: harmony
 
-      - name: kafbat-ui
-        wave: "0"
-        repoURL: https://kafbat.github.io/helm-charts
-        chart: kafka-ui
-        targetRevision: "*"
-        namespace: harmony
+          - name: kafbat-ui
+            wave: "0"
+            repoURL: https://kafbat.github.io/helm-charts
+            chart: kafka-ui
+            targetRevision: "*"
+            namespace: harmony
   template:
     metadata:
       name: "local-{{ .name }}"
