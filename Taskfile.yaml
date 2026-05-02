@@ -81,7 +81,7 @@ tasks:
   argocd:bootstrap:
     desc: "🐙 ARGOCD: Apply local bootstrap Application"
     cmds:
-      - kubectl apply -f infra/k8s/appsets/bootstrap.yaml
+      - kubectl apply -f environments/local/bootstrap.yaml
 
   # For now we can use app-repo tasks to do the first half then run the second half here
   # kind:argocd:setup:
