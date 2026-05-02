@@ -1,0 +1,15 @@
+fullnameOverride: dynamodb
+persistence:
+  enabled: true
+  size: 1Gi
+replicaCount: 1
+resources:
+  limits:
+    cpu: 200m
+    memory: 512Mi
+  requests:
+    cpu: 50m
+    memory: 256Mi
+service:
+  port: 8000
+  type: ClusterIP

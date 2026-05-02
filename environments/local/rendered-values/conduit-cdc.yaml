@@ -1,0 +1,61 @@
+autoscaling:
+  enabled: false
+  maxReplicas: 5
+  minReplicas: 1
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+image:
+  pullPolicy: IfNotPresent
+  repository: conduit.docker.scarf.sh/conduitio/conduit
+  tag: latest
+pipeline:
+  filename: postgres-cdc.yaml
+  mountDir: /app/pipelines
+pipelineConfig:
+  pipelines:
+    - connectors:
+        - id: pg-source
+          plugin: builtin:postgres
+          settings:
+            logrepl.publicationName: harmony_pub
+            logrepl.slotName: harmony_slot
+            snapshotMode: never
+            tables: outbox_events
+            url: postgres://harmony:${POSTGRES_PASSWORD}@postgres:5432/harmony?sslmode=disable&search_path=public
+          type: source
+        - id: kafka-dest
+          plugin: builtin:kafka
+          settings:
+            sdk.record.format: template
+            sdk.record.format.options: '{{ if .Payload.After }}{{ toJson .Payload.After }}{{ else }}{{ toJson .Payload.Before }}{{ end }}'
+            servers: automq-kafka:9092
+            topic: '{{ index .Payload.After "aggregate_type" }}'
+          type: destination
+      description: Stream outbox events from Postgres to Kafka using the outbox pattern
+      id: postgres-outbox-cdc
+      name: Postgres Outbox CDC
+      processors:
+        - id: use-aggregate-id-as-key
+          plugin: custom.javascript
+          settings:
+            script: "function process(rec) {\n  if (rec.Payload.After != null && rec.Payload.After[\"aggregate_id\"] != null) {\n    rec.Key = RawData(rec.Payload.After[\"aggregate_id\"]);\n    \n    delete rec.Metadata[\"opencdc.key.schema.subject\"];\n    delete rec.Metadata[\"opencdc.key.schema.version\"];\n  }\n  return rec;\n}\n"
+            sdk.schema.decode.key.enabled: "false"
+            sdk.schema.encode.key.enabled: "false"
+        - id: parse-json-payload
+          plugin: json.decode
+          settings:
+            field: .Payload.After.payload
+      status: running
+  version: 2.2
+postgresSecret:
+  key: postgres_password
+  name: postgres-auth-secret
+replicaCount: 1
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+secretEnv: null

@@ -1,0 +1,71 @@
+args: []
+autoscaling:
+  enabled: false
+  maxReplicas: 10
+  minReplicas: 1
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+command: []
+env:
+  APP_ENV: development
+  AUTH__ACCESS_TOKEN_EXPIRE_MINUTES: "15"
+  AUTH__ACCESS_TOKEN_NAME: access_token
+  AUTH__ALGORITHM: HS256
+  AUTH__REFRESH_TOKEN_EXPIRE_DAYS: "7"
+  AUTH__REFRESH_TOKEN_GRACE_PERIOD_SECONDS: "2"
+  AUTH__REFRESH_TOKEN_NAME: refresh_token
+  AWS__REGION: us-east-1
+  CACHE__CHAT_METADATA_TTL_SECONDS: "600"
+  CACHE__DEFAULT_TTL_SECONDS: "300"
+  CACHE__MEMBERSHIP_TTL_SECONDS: "300"
+  CACHE__USER_TTL_SECONDS: "300"
+  CHAT__DEFAULT_PAGINATION_LIMIT: "50"
+  CHAT__MAX_USERS_PER_OPERATION: "10"
+  CHAT__MESSAGE_TOPIC: local_chat_messages
+  CHAT__TOPIC: local_chat_events
+  DEBUG: "true"
+  DYNAMODB__CHAT_HISTORY_TABLE_NAME: local_harmony_chat_history
+  DYNAMODB__URL: http://dynamodb:8000
+  FEATURES__CACHE_REDIS: "true"
+  KAFKA_PRODUCER__BOOTSTRAP_SERVERS: automq-kafka:9092
+  KAFKA_PRODUCER__RETRY_BACKOFF_MS: "500"
+  POSTGRES__URL: postgresql+asyncpg://harmony:$(POSTGRES_PASSWORD)@postgres:5432/harmony?ssl=disable
+  PROJECT_NAME: Harmony Chat
+  REDIS__HEALTH_CHECK_INTERVAL: "30"
+  REDIS__REQUEST_TIMEOUT_MS: "100"
+  REDIS__URL: redis://redis-master:6379/1
+  USER__DEFAULT_USER_SEARCH_LIMIT: "10"
+  USER__TOPIC: local_user_events
+fullnameOverride: api
+image:
+  pullPolicy: Never
+  repository: harmony-backend
+  tag: local
+podAnnotations:
+  secret.reloader.stakater.com/reload: tf-outputs-secret
+replicaCount: 1
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+secretEnv:
+  - name: AUTH__SECRET_KEY
+    secretKey: secret_key
+    secretName: app-auth-secret
+  - name: AWS__ACCESS_KEY_ID
+    secretKey: access_key_id
+    secretName: aws-auth-secret
+  - name: AWS__SECRET_ACCESS_KEY
+    secretKey: secret_access_key
+    secretName: aws-auth-secret
+  - name: POSTGRES_PASSWORD
+    secretKey: postgres_password
+    secretName: postgres-auth-secret
+service:
+  enabled: true
+  nodePort: 30800
+  port: 8000
+  type: NodePort

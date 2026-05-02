@@ -1,0 +1,22 @@
+auth:
+  database: harmony
+  existingSecret: postgres-auth-secret
+  secretKeys:
+    adminPasswordKey: postgres_password
+    userPasswordKey: postgres_password
+  username: harmony
+fullnameOverride: postgres
+primary:
+  extendedConfiguration: |
+    wal_level = logical
+    max_replication_slots = 10
+    max_wal_senders = 10
+  initdb:
+    scripts:
+      01-grant-replication.sh: |-
+        #!/bin/sh
+        export PGPASSWORD=$POSTGRES_POSTGRES_PASSWORD
+        psql -U postgres -d harmony -c "ALTER ROLE harmony WITH REPLICATION;"
+  persistence:
+    enabled: true
+    size: 2Gi

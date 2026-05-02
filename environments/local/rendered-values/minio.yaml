@@ -1,0 +1,18 @@
+buckets:
+  - name: automq-data-local
+    policy: none
+    purge: false
+  - name: automq-ops-local
+    policy: none
+    purge: false
+mode: standalone
+persistence:
+  enabled: true
+  size: 2Gi
+  storageClass: standard
+replicas: 1
+resources:
+  requests:
+    memory: 512Mi
+rootPassword: minioadmin
+rootUser: minioadmin

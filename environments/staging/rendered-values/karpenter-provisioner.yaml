@@ -1,0 +1,4 @@
+clusterName: harmony-staging-eks
+limits:
+  cpu: 1000
+  memory: 1000Gi

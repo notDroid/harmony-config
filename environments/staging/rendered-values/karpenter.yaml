@@ -1,0 +1,3 @@
+settings:
+  clusterName: harmony-staging-eks
+  interruptionQueue: Karpenter-harmony-staging-eks

@@ -1,0 +1,18 @@
+config:
+  dynamodbTables:
+    ChatHistory:
+      AttributeDefinitions:
+        - AttributeName: chat_id
+          AttributeType: S
+        - AttributeName: ulid
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: chat_id
+          KeyType: HASH
+        - AttributeName: ulid
+          KeyType: RANGE
+      TableName: local_harmony_chat_history
+dynamodb:
+  endpoint: http://dynamodb:8000
+  region: us-east-1

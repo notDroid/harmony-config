@@ -105,8 +105,8 @@ infra:
     path_style: "false"
     region: "us-east-1"
     buckets:
-      automq_data: "harmony-chat-automq-data-staging-${AWS_ACCOUNT_ID}" 
-      automq_ops: "harmony-chat-automq-ops-staging-${AWS_ACCOUNT_ID}"
+      automq_data: "harmony-chat-automq-data-staging-638054608587" 
+      automq_ops: "harmony-chat-automq-ops-staging-638054608587"
 
   kafka:
     controller_replica_count: 3

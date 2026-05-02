@@ -1,0 +1,17 @@
+image:
+  pullPolicy: IfNotPresent
+  registry: ghcr.io
+  repository: kafbat/kafka-ui
+  tag: latest
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+yamlApplicationConfig:
+  kafka:
+    clusters:
+      - bootstrapServers: automq-kafka:9092
+        name: harmony-cluster

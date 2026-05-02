@@ -1,0 +1,56 @@
+args:
+  - -m
+  - harmony.consumer.main
+autoscaling:
+  enabled: false
+  maxReplicas: 10
+  minReplicas: 1
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+command:
+  - python
+env:
+  APP_ENV: development
+  AWS__REGION: us-east-1
+  CONSUMER_NAME: Harmony CDC Worker
+  DYNAMODB__CHAT_HISTORY_TABLE_NAME: local_harmony_chat_history
+  DYNAMODB__URL: http://dynamodb:8000
+  FEATURES__CACHE_REDIS: "true"
+  KAFKA_CONSUMER__BOOTSTRAP_SERVERS: automq-kafka:9092
+  KAFKA_CONSUMER__FETCH_MAX_BYTES: "52428800"
+  KAFKA_CONSUMER__GROUP_ID: local_cdc_consumer
+  KAFKA_CONSUMER__MAX_POLL_RECORDS: "500"
+  KAFKA_CONSUMER__POLL_TIMEOUT_MS: "1000"
+  KAFKA_CONSUMER__SESSION_TIMEOUT_MS: "10000"
+  POSTGRES__URL: postgresql+asyncpg://harmony:$(POSTGRES_PASSWORD)@postgres:5432/harmony
+  REDIS__HEALTH_CHECK_INTERVAL: "30"
+  REDIS__REQUEST_TIMEOUT_MS: "100"
+  REDIS__URL: redis://redis-master:6379/1
+  TOPICS__CHAT: local_chat_events
+  TOPICS__USER: local_user_events
+image:
+  pullPolicy: Never
+  repository: harmony-backend
+  tag: local
+podAnnotations:
+  secret.reloader.stakater.com/reload: tf-outputs-secret
+replicaCount: 1
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+secretEnv:
+  - name: AWS__ACCESS_KEY_ID
+    secretKey: access_key_id
+    secretName: aws-auth-secret
+  - name: AWS__SECRET_ACCESS_KEY
+    secretKey: secret_access_key
+    secretName: aws-auth-secret
+  - name: POSTGRES_PASSWORD
+    secretKey: postgres_password
+    secretName: postgres-auth-secret
+service:
+  enabled: false

@@ -1,0 +1,75 @@
+broker:
+  extraConfig: |
+    elasticstream.enable=true
+    s3.ops.buckets=1@s3://automq-ops-local?region=us-east-1&pathStyle=true&endpoint=http://minio:9000
+    s3.data.buckets=0@s3://automq-data-local?region=us-east-1&pathStyle=true&endpoint=http://minio:9000
+    s3.wal.path=0@s3://automq-data-local?region=us-east-1&pathStyle=true&endpoint=http://minio:9000
+    s3.wal.cache.size=536870912
+    s3.block.cache.size=536870912
+    s3.stream.allocator.policy=POOLED_DIRECT
+  heapOpts: -Xmx1g -Xms1g -XX:MaxDirectMemorySize=1536m -XX:MetaspaceSize=96m
+  hpa:
+    enabled: false
+    maxReplicas: 10
+    minReplicas: 1
+    targetCPU: 80
+    targetMemory: 80
+  minId: 1000
+  persistence:
+    size: 2Gi
+    storageClass: standard
+  replicaCount: 1
+  resources:
+    limits:
+      cpu: "1"
+      memory: 4Gi
+    requests:
+      cpu: 500m
+      memory: 3Gi
+controller:
+  extraConfig: |
+    elasticstream.enable=true
+    s3.ops.buckets=1@s3://automq-ops-local?region=us-east-1&pathStyle=true&endpoint=http://minio:9000
+    s3.data.buckets=0@s3://automq-data-local?region=us-east-1&pathStyle=true&endpoint=http://minio:9000
+    s3.wal.path=0@s3://automq-data-local?region=us-east-1&pathStyle=true&endpoint=http://minio:9000
+    s3.wal.cache.size=536870912
+    s3.block.cache.size=536870912
+    s3.stream.allocator.policy=POOLED_DIRECT
+  heapOpts: -Xmx1g -Xms1g -XX:MaxDirectMemorySize=1536m -XX:MetaspaceSize=96m
+  persistence:
+    size: 2Gi
+    storageClass: standard
+  replicaCount: 1
+  resources:
+    limits:
+      cpu: "1"
+      memory: 4Gi
+    requests:
+      cpu: 500m
+      memory: 3Gi
+extraEnvVars:
+  - name: AWS_ACCESS_KEY_ID
+    valueFrom:
+      secretKeyRef:
+        key: access_key
+        name: s3-auth-secret
+  - name: AWS_SECRET_ACCESS_KEY
+    valueFrom:
+      secretKeyRef:
+        key: secret_key
+        name: s3-auth-secret
+global:
+  security:
+    allowInsecureImages: true
+image:
+  pullPolicy: Always
+  registry: automqinc
+  repository: automq
+  tag: 1.6.0-bitnami
+listeners:
+  client:
+    protocol: PLAINTEXT
+  controller:
+    protocol: PLAINTEXT
+  interbroker:
+    protocol: PLAINTEXT

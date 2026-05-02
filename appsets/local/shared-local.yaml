@@ -1,0 +1,57 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: harmony-shared-local
+  namespace: argocd
+spec:
+  goTemplate: true
+  generators:
+    - list:
+        elements:
+          - name: secrets
+            wave: "-3"
+            chartPath: infra/k8s/charts/secrets
+            namespace: harmony
+
+          - name: backend
+            wave: "0"
+            chartPath: infra/k8s/charts/harmony
+            namespace: harmony
+
+          - name: consumer
+            wave: "0"
+            chartPath: infra/k8s/charts/harmony
+            namespace: harmony
+
+          - name: conduit-cdc
+            wave: "0"
+            chartPath: infra/k8s/charts/conduit
+            namespace: harmony
+
+  template:
+    metadata:
+      name: "local-{{ .name }}"
+      namespace: argocd
+      annotations:
+        argocd.argoproj.io/sync-wave: "{{ .wave }}"
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/notDroid/HarmonyChat.git
+        targetRevision: HEAD
+        path: "{{ .chartPath }}"
+        helm:
+          releaseName: "{{ .name }}"
+          valueFiles:
+            - $values/infra/environments/local/rendered-values/local/{{ .name }}.yaml
+
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{ .namespace }}"
+
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
+        automated:
+          prune: true
+          selfHeal: true

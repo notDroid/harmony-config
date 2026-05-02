@@ -1,0 +1,49 @@
+config:
+  input:
+    label: kafka_consumer
+    redpanda:
+      consumer_group: local_dynamodb_sink
+      seed_brokers:
+        - automq-kafka:9092
+      topics:
+        - local_chat_messages
+  output:
+    aws_dynamodb:
+      credentials:
+        id: ${AWS_ACCESS_KEY_ID}
+        secret: ${AWS_SECRET_ACCESS_KEY}
+      endpoint: http://dynamodb:8000
+      json_map_columns:
+        "": .
+      region: us-east-1
+      table: local_harmony_chat_history
+    label: dynamodb_sink
+  pipeline:
+    processors:
+      - mapping: |
+          root = this.without("author_metadata")
+env:
+  - name: AWS_ACCESS_KEY_ID
+    valueFrom:
+      secretKeyRef:
+        key: access_key_id
+        name: aws-auth-secret
+  - name: AWS_SECRET_ACCESS_KEY
+    valueFrom:
+      secretKeyRef:
+        key: secret_access_key
+        name: aws-auth-secret
+hpa:
+  enabled: false
+  maxReplicas: 5
+  minReplicas: 1
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+replicaCount: 1
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi

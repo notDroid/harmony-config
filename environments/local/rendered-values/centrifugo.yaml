@@ -1,0 +1,72 @@
+config:
+  channel:
+    namespaces:
+      - history_size: 100
+        history_ttl: 3600s
+        name: chat
+        presence: true
+        subscribe_proxy_enabled: true
+    proxy:
+      subscribe:
+        endpoint: http://api:8000/api/v1/ws/subscribe
+        timeout: 1s
+  client:
+    allowed_origins:
+      - '*'
+    proxy:
+      connect:
+        enabled: true
+        endpoint: http://api:8000/api/v1/ws/connect
+        http_headers:
+          - Cookie
+        timeout: 1s
+  consumers:
+    - enabled: true
+      kafka:
+        brokers:
+          - automq-kafka:9092
+        consumer_group: local_centrifugo_consumer
+        publication_data_mode:
+          channels_header: x-centrifugo-channels
+          enabled: true
+        topics:
+          - local_chat_messages
+      name: chat_kafka_consumer
+      type: kafka
+  engine:
+    redis:
+      address: redis://redis-master:6379
+      prefix: centrifugo
+    type: redis
+envSecret:
+  - name: CENTRIFUGO_API_KEY
+    secretKeyRef:
+      key: api_key
+      name: centrifugo-auth-secret
+  - name: CENTRIFUGO_ADMIN_PASSWORD
+    secretKeyRef:
+      key: admin_password
+      name: centrifugo-auth-secret
+  - name: CENTRIFUGO_ADMIN_SECRET
+    secretKeyRef:
+      key: admin_secret
+      name: centrifugo-auth-secret
+fullnameOverride: centrifugo
+hpa:
+  enabled: false
+  maxReplicas: 10
+  minReplicas: 1
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+replicaCount: 1
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+service:
+  nodePort: 30810
+  port: 8000
+  type: NodePort

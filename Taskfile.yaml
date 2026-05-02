@@ -6,34 +6,17 @@ env:
   SOPS_AGE_KEY_FILE: "{{.ROOT_DIR}}/keys.txt"
 
 vars:
-  PROJECT_NAME:
-    sh: "yq '.project.name' config.yaml"
-  K8S_REPO_URL:
-    sh: "yq '.project.repo_url' config.yaml"
-  K8S_VERSION:
-    sh: "yq '.k8s.version' config.yaml"
-  REGISTRY_URL:
-    sh: "yq '.registry.url' config.yaml"
-  LOCAL_REGISTRY_URL:
-    sh: "yq '.registry.local_url' config.yaml"
-  
-  K8S_ENV: '{{.K8S_ENV | default "local"}}'
-  K8S_CACHE_DIR: .cache/k8s
-  MANIFEST_OUTPUT_DIR: dist/{{.K8S_ENV}}-manifests
-  
-  REGISTRY_BASE: '{{if eq .K8S_ENV "local"}}{{.LOCAL_REGISTRY_URL}}{{else}}{{.REGISTRY_URL}}{{end}}'
-  CHART_NAME: '{{.PROJECT_NAME}}-manifests-{{.K8S_ENV}}'
-  CHART_VERSION: '{{.CHART_VERSION | default "0.0.1-local"}}'
-  TARGET_REVISION: '{{.TARGET_REVISION | default "*"}}'
-  
-  HELMFILE_ENV: '{{if eq .K8S_ENV "local"}}local{{else}}remote{{end}}'
+  REPO_URL: "https://github.com/notDroid/HarmonyChat.git"
+  VERSION:
+    sh: "yq '.version' config.yaml"
+
+  K8S_CACHE_DIR: .cache/
+  K8S_ENV: '{{.K8S_ENV | default "local"}}' # IMPORTANT: set through .env or CLI flag
   CONFIG_HELMFILE_VALUES: >-
-    {{if eq .K8S_ENV "local"}}
-    --state-values-file ../../environments/local/values.yaml
-    --state-values-file ../../environments/local/secrets.yaml
-    {{else}}
-    --state-values-file ../../environments/{{.K8S_ENV}}/expanded-values.yaml.gotmpl
-    {{end}}
+    --state-values-file ../../environments/{{.K8S_ENV}}/values.yaml
+    --state-values-file ../../environments/{{.K8S_ENV}}/secrets.yaml
+  HELMFILE_ENV: '{{if eq .K8S_ENV "local"}}local{{else}}remote{{end}}'
+  HELMFILE_CMD: "helmfile -e {{.HELMFILE_ENV}} {{.CONFIG_HELMFILE_VALUES}} --skip-deps"
 
 tasks:
   default:
@@ -69,87 +52,76 @@ tasks:
       - sops -d -i environments/{{.K8S_ENV}}/secrets.yaml
 
   # --------------------------------------------------------------------------
-  # 2. LOCAL DEV
-  # --------------------------------------------------------------------------
-
-  kind:create:
-    desc: "☸️  Create local cluster"
-    cmds: ["kind create cluster --config environments/{{.K8S_ENV}}/kind-config.yaml --name {{.PROJECT_NAME}}"]
-    status: ["kind get clusters | grep {{.PROJECT_NAME}}"]
-
-  argocd:install:
-    desc: "🐙 Install ArgoCD and Namespaces"
-    cmds:
-      - kubectl create namespace argocd
-      - kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-
-  argocd:deploy:
-    desc: "🐙 Apply ArgoCD Application"
-    env:
-      PROJECT_NAME: '{{.PROJECT_NAME}}'
-      K8S_ENV: '{{.K8S_ENV}}'
-      REGISTRY_BASE: '{{.REGISTRY_BASE}}'
-      CHART_NAME: '{{.CHART_NAME}}'
-      CHART_VERSION: '{{.CHART_VERSION}}'
-      TARGET_REVISION: '{{.TARGET_REVISION}}'
-    cmds:
-      - envsubst < environments/{{.K8S_ENV}}/argocd/application.yaml.tmpl | kubectl apply -n argocd -f -
-
-  argocd:ui:
-    desc: "🐙 Open ArgoCD UI"
-    cmds:
-      - |
-        echo "Opening ArgoCD UI at http://localhost:8080"
-        echo "Login with admin / $(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
-        open "http://localhost:8080"
-        kubectl port-forward -n argocd service/argocd-server 8080:80
-
-  argocd:repo:creds:
-    desc: "🐙 Configure ArgoCD with ghcr.io credentials using the gh CLI"
-    cmds:
-      - |
-        GITHUB_USERNAME=$(gh api user -q ".login" | tr '[:upper:]' '[:lower:]')
-        GITHUB_TOKEN=$(gh auth token)
-        export GITHUB_USERNAME
-        export GITHUB_TOKEN
-        envsubst < environments/{{.K8S_ENV}}/argocd/ghcr-creds.yaml.tmpl | kubectl apply -n argocd -f -
-
-  kind:setup:
-    desc: "☸️  Setup local Kind cluster with ArgoCD"
-    cmds:
-      - task: kind:create
-      - task: argocd:install
-      - task: argocd:repo:creds
-
-  # --------------------------------------------------------------------------
-  # 3. INFRA
+  # 2. INFRASTRUCTURE
   # --------------------------------------------------------------------------
 
   infra:fetch:
-    desc: "⬇️ Fetch agnostic k8s components"
-    env:
-      LOCAL_INFRA_PATH: '{{.LOCAL_INFRA_PATH}}'
-    cmds: 
-      - uv run scripts/fetch-k8s.py "{{.K8S_VERSION}}" "{{.K8S_CACHE_DIR}}" "{{.K8S_REPO_URL}}"
-
-  infra:template:
-    desc: "📄 Template Helmfile to standard manifests"
-    deps: [infra:fetch]
+    desc: "🚚 INFRA: Fetch k8s templates from app-repo"
     cmds:
-      - rm -rf {{.MANIFEST_OUTPUT_DIR}}
-      - mkdir -p {{.MANIFEST_OUTPUT_DIR}}
-      - |
-        cd {{.K8S_CACHE_DIR}} && \
-        helmfile --environment {{.HELMFILE_ENV}} {{.CONFIG_HELMFILE_VALUES}} \
-                 template --include-crds --output-dir ../../{{.MANIFEST_OUTPUT_DIR}}
-      - |
-        cd {{.K8S_CACHE_DIR}} && \
-        helmfile --environment {{.HELMFILE_ENV}} {{.CONFIG_HELMFILE_VALUES}} \
-                 list --output json > ../../{{.MANIFEST_OUTPUT_DIR}}/releases.json
-      - uv run scripts/inject_waves.py "{{.MANIFEST_OUTPUT_DIR}}"
+      - uv run scripts/fetch-k8s.py {{.VERSION}} {{.K8S_CACHE_DIR}}/k8s {{.REPO_URL}}
 
-  infra:publish:
-    desc: "📦 Package and push OCI artifact"
-    deps: [infra:template]
-    cmds: 
-      - uv run scripts/package-oci.py "{{.MANIFEST_OUTPUT_DIR}}" "{{.CHART_NAME}}" "{{.CHART_VERSION}}" "{{.REGISTRY_BASE}}"
+  infra:render:
+    desc: "📄 INFRA: Render environment .gotmpl files to rendered-values/"
+    dir: .cache/k8s
+    cmds:
+      - mkdir -p ../../environments/{{.K8S_ENV}}/rendered-values
+      - "helmfile -e {{.HELMFILE_ENV}} {{.CONFIG_HELMFILE_VALUES}} --skip-deps write-values --output-file-template='../../environments/{{.K8S_ENV}}/rendered-values/{{`{{.Release.Name}}`}}.yaml'"
+
+  # --------------------------------------------------------------------------
+  # 3. ARGOCD
+  # --------------------------------------------------------------------------
+
+  argocd:install:
+    desc: "🐙 ARGOCD: Install ArgoCD"
+    cmds:
+      - kubectl create namespace argocd || true
+      - kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+      - kubectl wait --for=condition=available --timeout=600s deployment/argocd-server -n argocd
+
+  argocd:bootstrap:
+    desc: "🐙 ARGOCD: Apply local bootstrap Application"
+    cmds:
+      - kubectl apply -f infra/k8s/appsets/bootstrap.yaml
+
+  # For now we can use app-repo tasks to do the first half then run the second half here
+  # kind:argocd:setup:
+  #   desc: "🚀 K8S: setup cluster + build + argocd install + bootstrap"
+  #   cmds:
+  #     - task: kind:cluster:create
+  #     - task: image:load:kind
+  #     - task: argocd:install
+  #     - task: argocd:bootstrap
+
+  argocd:ui:
+    desc: Port-forward ArgoCD UI to localhost:8080
+    cmds:
+      - kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d; echo
+      - kubectl port-forward svc/argocd-server -n argocd 8080:443
+
+  # --------------------------------------------------------------------------
+  # 4. Terraform
+  # --------------------------------------------------------------------------
+
+  tf:init:
+    desc: "🌍 TF: Initialize Terragrunt for the target K8S_ENV"
+    dir: infra/terraform/environments/{{.K8S_ENV}}
+    cmds:
+      - terragrunt init
+
+  tf:plan:
+    desc: "🌍 TF: Plan Terragrunt infrastructure for the target K8S_ENV"
+    dir: infra/terraform/environments/{{.K8S_ENV}}
+    cmds:
+      - terragrunt plan
+
+  tf:apply:
+    desc: "🌍 TF: Apply Terragrunt infrastructure for the target K8S_ENV"
+    dir: infra/terraform/environments/{{.K8S_ENV}}
+    cmds:
+      - terragrunt apply
+  
+  tf:destroy:
+    desc: "🌍 TF: Destroy Terragrunt infrastructure for the target K8S_ENV"
+    dir: infra/terraform/environments/{{.K8S_ENV}}
+    cmds:
+      - terragrunt destroy

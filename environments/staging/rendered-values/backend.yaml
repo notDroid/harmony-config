@@ -1,0 +1,77 @@
+args: []
+autoscaling:
+  enabled: true
+  maxReplicas: 20
+  minReplicas: 1
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+command: []
+env:
+  APP_ENV: development
+  AUTH__ACCESS_TOKEN_EXPIRE_MINUTES: "15"
+  AUTH__ACCESS_TOKEN_NAME: access_token
+  AUTH__ALGORITHM: HS256
+  AUTH__REFRESH_TOKEN_EXPIRE_DAYS: "7"
+  AUTH__REFRESH_TOKEN_GRACE_PERIOD_SECONDS: "2"
+  AUTH__REFRESH_TOKEN_NAME: refresh_token
+  AWS__REGION: us-east-1
+  CACHE__CHAT_METADATA_TTL_SECONDS: "600"
+  CACHE__DEFAULT_TTL_SECONDS: "300"
+  CACHE__MEMBERSHIP_TTL_SECONDS: "300"
+  CACHE__USER_TTL_SECONDS: "300"
+  CHAT__DEFAULT_PAGINATION_LIMIT: "50"
+  CHAT__MAX_USERS_PER_OPERATION: "50"
+  CHAT__MESSAGE_TOPIC: staging_chat_messages
+  CHAT__TOPIC: staging_chat_events
+  DEBUG: "false"
+  DYNAMODB__CHAT_HISTORY_TABLE_NAME: chat_history_staging
+  DYNAMODB__URL: https://dynamodb.us-east-1.amazonaws.com:443
+  FEATURES__CACHE_REDIS: "true"
+  KAFKA_PRODUCER__BOOTSTRAP_SERVERS: automq-kafka:9092
+  KAFKA_PRODUCER__RETRY_BACKOFF_MS: "500"
+  POSTGRES__URL: postgresql+asyncpg://harmony:$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):5432/harmony?ssl=require
+  PROJECT_NAME: Harmony Chat
+  REDIS__HEALTH_CHECK_INTERVAL: "30"
+  REDIS__REQUEST_TIMEOUT_MS: "100"
+  REDIS__URL: redis://$(REDIS_HOST):6379/1
+  USER__DEFAULT_USER_SEARCH_LIMIT: "20"
+  USER__TOPIC: staging_user_events
+fullnameOverride: api
+image:
+  pullPolicy: Always
+  repository: ghcr.io/notdroid/harmonychat
+  tag: v1.0.3
+podAnnotations:
+  secret.reloader.stakater.com/reload: tf-outputs-secret
+replicaCount: 1
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+secretEnv:
+  - name: POSTGRES_HOST
+    secretKey: rds_endpoint
+    secretName: tf-outputs-secret
+  - name: REDIS_HOST
+    secretKey: redis_endpoint
+    secretName: tf-outputs-secret
+  - name: AUTH__SECRET_KEY
+    secretKey: secret_key
+    secretName: app-auth-secret
+  - name: AWS__ACCESS_KEY_ID
+    secretKey: access_key_id
+    secretName: aws-auth-secret
+  - name: AWS__SECRET_ACCESS_KEY
+    secretKey: secret_access_key
+    secretName: aws-auth-secret
+  - name: POSTGRES_PASSWORD
+    secretKey: postgres_password
+    secretName: postgres-auth-secret
+service:
+  enabled: true
+  nodePort: 30800
+  port: 8000
+  type: NodePort

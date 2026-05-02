@@ -1,0 +1,62 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: harmony-local-only-external
+  namespace: argocd
+spec:
+  goTemplate: true
+  generators:
+    - list:
+        elements:
+          - name: minio
+            wave: "-2"
+            repoURL: https://charts.min.io/
+            chart: minio
+            targetRevision: 5.0.15
+            namespace: harmony
+
+          - name: postgresql
+            wave: "-2"
+            repoURL: https://charts.bitnami.com/bitnami
+            chart: postgresql
+            targetRevision: 15.5.34
+            namespace: harmony
+
+          - name: redis
+            wave: "-2"
+            repoURL: https://charts.bitnami.com/bitnami
+            chart: redis
+            targetRevision: 20.1.5
+            namespace: harmony
+
+  template:
+    metadata:
+      name: "local-{{ .name }}"
+      namespace: argocd
+      annotations:
+        argocd.argoproj.io/sync-wave: "{{ .wave }}"
+    spec:
+      project: default
+      sources:
+        - repoURL: https://github.com/notDroid/HarmonyChat.git
+          targetRevision: HEAD
+          ref: values
+
+        - repoURL: "{{ .repoURL }}"
+          chart: "{{ .chart }}"
+          targetRevision: "{{ .targetRevision }}"
+          helm:
+            releaseName: "{{ .name }}"
+            valueFiles:
+              - $values/infra/environments/local/rendered-values/local/{{ .name }}.yaml
+
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{ .namespace }}"
+
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
+        automated:
+          prune: true
+          selfHeal: true
