@@ -13,27 +13,27 @@ spec:
             - key: wave
               operator: In
               values:
-                - "-4"
+                - "w-4"
         - matchExpressions:
             - key: wave
               operator: In
               values:
-                - "-3"
+                - "w-3"
         - matchExpressions:
             - key: wave
               operator: In
               values:
-                - "-2"
+                - "w-2"
         - matchExpressions:
             - key: wave
               operator: In
               values:
-                - "-1"
+                - "w-1"
         - matchExpressions:
             - key: wave
               operator: In
               values:
-                - "0"
+                - "w0"
   generators:
     - list:
         elements:
@@ -165,7 +165,10 @@ spec:
       name: "local-{{ .name }}"
       namespace: argocd
       labels:
-        wave: "{{ .wave }}"
+        # "w" prefix is required: Kubernetes labels must start with an
+        # alphanumeric character, so bare "-4" etc. are invalid.
+        # The rollingSync matchExpressions above match these "w-4" values.
+        wave: "w{{ .wave }}"
     spec:
       project: default
       sources:
