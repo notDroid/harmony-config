@@ -38,7 +38,7 @@ spec:
     spec:
       project: default
       sources:
-        - repoURL: https://github.com/notDroid/HarmonyChat.git
+        - repoURL: https://github.com/notDroid/harmony-config.git
           targetRevision: HEAD
           ref: values
 
@@ -48,7 +48,7 @@ spec:
           helm:
             releaseName: "{{ .name }}"
             valueFiles:
-              - $values/infra/environments/local/rendered-values/local/{{ .name }}.yaml
+              - $values/environments/local/rendered-values/{{ .name }}.yaml
 
       destination:
         server: https://kubernetes.default.svc

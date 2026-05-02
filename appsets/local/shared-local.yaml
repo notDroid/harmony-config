@@ -36,14 +36,17 @@ spec:
         argocd.argoproj.io/sync-wave: "{{ .wave }}"
     spec:
       project: default
-      source:
-        repoURL: https://github.com/notDroid/HarmonyChat.git
-        targetRevision: HEAD
-        path: "{{ .chartPath }}"
-        helm:
-          releaseName: "{{ .name }}"
-          valueFiles:
-            - $values/infra/environments/local/rendered-values/local/{{ .name }}.yaml
+      sources:
+        - repoURL: https://github.com/notDroid/harmony-config.git
+          targetRevision: HEAD
+          ref: values
+        - repoURL: https://github.com/notDroid/HarmonyChat.git
+          targetRevision: HEAD
+          path: "{{ .chartPath }}"
+          helm:
+            releaseName: "{{ .name }}"
+            valueFiles:
+              - $values/environments/local/rendered-values/{{ .name }}.yaml
 
       destination:
         server: https://kubernetes.default.svc
