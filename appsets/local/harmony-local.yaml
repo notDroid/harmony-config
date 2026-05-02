@@ -104,7 +104,7 @@ spec:
           - name: automq
             wave: "-1"
             type: external
-            repoURL: oci://registry-1.docker.io/bitnamicharts
+            repoURL: oci://registry-1.docker.io/bitnamicharts/kafka
             chart: kafka
             targetRevision: "31.5.0"
             namespace: harmony
@@ -162,7 +162,7 @@ spec:
 
   template:
     metadata:
-      name: "local-{{ .name }}"
+      name: "{{ .name }}"
       namespace: argocd
       labels:
         # "w" prefix is required: Kubernetes labels must start with an
@@ -196,3 +196,17 @@ spec:
         automated:
           prune: true
           selfHeal: true
+
+  templatePatch: |
+    {{- if eq .name "kube-prometheus-stack" }}
+    spec:
+      ignoreDifferences:
+        - group: admissionregistration.k8s.io
+          kind: MutatingWebhookConfiguration
+          jqPathExpressions:
+            - '.webhooks[]?.clientConfig.caBundle'
+        - group: admissionregistration.k8s.io
+          kind: ValidatingWebhookConfiguration
+          jqPathExpressions:
+            - '.webhooks[]?.clientConfig.caBundle'
+    {{- end }}
