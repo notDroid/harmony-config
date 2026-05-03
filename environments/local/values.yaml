@@ -46,7 +46,7 @@ app:
 workloads:
   image:
     repository: "harmony-backend"
-    tag: "local"
+    tag: "latest"
     pullPolicy: "Never"
   api:
     host: "api"
@@ -59,6 +59,9 @@ workloads:
 # 3. INFRASTRUCTURE & TOPOLOGY
 # ==========================================
 infra:
+  local:
+     dynamodbInitImage: "init-dynamodb:latest"
+     
   k8s:
     storage_class: "standard"
     

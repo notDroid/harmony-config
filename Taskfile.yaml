@@ -70,6 +70,12 @@ tasks:
       - mkdir -p ../../environments/{{.K8S_ENV}}/rendered-values
       - "helmfile -e {{.HELMFILE_ENV}} {{.CONFIG_HELMFILE_VALUES}} --skip-deps write-values --output-file-template='../../environments/{{.K8S_ENV}}/rendered-values/{{`{{.Release.Name}}`}}.yaml'"
 
+  infra:sync:
+    desc: "🔄 INFRA: Sync template and generated values"
+    cmds:
+      - task: infra:fetch
+      - task: infra:render
+
   # --------------------------------------------------------------------------
   # 3. ARGOCD
   # --------------------------------------------------------------------------

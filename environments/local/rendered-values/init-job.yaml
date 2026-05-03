@@ -14,5 +14,6 @@ config:
           KeyType: RANGE
       TableName: local_harmony_chat_history
 dynamodb:
+  dynamodbInit: init-dynamodb:latest
   endpoint: http://dynamodb:8000
   region: us-east-1

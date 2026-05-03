@@ -31,7 +31,7 @@ env:
 image:
   pullPolicy: Never
   repository: harmony-backend
-  tag: local
+  tag: latest
 podAnnotations:
   secret.reloader.stakater.com/reload: tf-outputs-secret
 replicaCount: 1
