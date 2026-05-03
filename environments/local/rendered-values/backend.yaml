@@ -38,8 +38,8 @@ env:
   USER__TOPIC: local_user_events
 fullnameOverride: api
 image:
-  pullPolicy: Never
-  repository: harmony-backend
+  pullPolicy: Always
+  repository: ghcr.io/notdroid/harmony/backend
   tag: latest
 podAnnotations:
   secret.reloader.stakater.com/reload: tf-outputs-secret

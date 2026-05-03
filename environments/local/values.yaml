@@ -45,9 +45,9 @@ app:
 # ==========================================
 workloads:
   image:
-    repository: "harmony-backend"
+    repository: "ghcr.io/notdroid/harmony/backend"
     tag: "latest"
-    pullPolicy: "Never"
+    pullPolicy: "Always"
   api:
     host: "api"
     port: 8000
@@ -60,7 +60,7 @@ workloads:
 # ==========================================
 infra:
   local:
-     dynamodbInitImage: "init-dynamodb:latest"
+     dynamodbInitImage: "ghcr.io/notdroid/harmony/init-dynamodb:latest"
      
   k8s:
     storage_class: "standard"
