@@ -60,7 +60,10 @@ workloads:
 # ==========================================
 infra:
   local:
-     dynamodbInitImage: "ghcr.io/notdroid/harmony/init-dynamodb:latest"
+    dynamodbInit:
+      repository: "ghcr.io/notdroid/harmony/init-dynamodb"
+      tag: "latest"
+      pullPolicy: "Always"
      
   k8s:
     storage_class: "standard"
