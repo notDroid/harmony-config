@@ -29,7 +29,7 @@ app:
 
   domains:
     chat:
-      max_users_per_operation: 10
+      max_users_per_operation: 20
       default_pagination_limit: 50
     user:
       default_search_limit: 10
