@@ -19,11 +19,7 @@ task secrets:encrypt   # Encrypt secrets.yaml in place using SOPS
 task secrets:decrypt   # Decrypt secrets.yaml in place using SOPS
 
 # Local E2E Testing (ArgoCD on Kind)
-task kind:setup        # Full local setup: kind cluster + ArgoCD + deploy manifests
-task kind:create       # Creates the local Kind cluster
 task argocd:install    # Installs ArgoCD and creates namespaces
-task argocd:deploy     # Applies the ArgoCD Application definition
-task kind:destroy      # Destroys the local cluster
 
 # Infrastructure & OCI Pipeline
 task infra:fetch       # Fetches agnostic k8s components into .cache/k8s based on K8S_VERSION in config.yaml

@@ -6,12 +6,12 @@ env:
   SOPS_AGE_KEY_FILE: "{{.ROOT_DIR}}/keys.txt"
 
 vars:
-  REPO_URL: "https://github.com/notDroid/HarmonyChat.git"
+  REPO_URL: "https://github.com/notDroid/HarmonyChat"
   VERSION:
     sh: "yq '.version' config.yaml"
 
-  K8S_CACHE_DIR: .cache/
   K8S_ENV: '{{.K8S_ENV | default "local"}}' # IMPORTANT: set through .env or CLI flag
+  K8S_CACHE_DIR: '.cache/{{.K8S_ENV}}'
   CONFIG_HELMFILE_VALUES: >-
     --state-values-file ../../environments/{{.K8S_ENV}}/values.yaml
     --state-values-file ../../environments/{{.K8S_ENV}}/secrets.yaml
@@ -22,10 +22,6 @@ tasks:
   default:
     silent: true
     cmds: [task --list-all]
-
-  clean:
-    desc: "🧹 Clean dist and cache directories"
-    cmds: [rm -rf dist/ .cache/]
 
   # --------------------------------------------------------------------------
   # 1. SECRETS
@@ -58,11 +54,18 @@ tasks:
   infra:fetch:
     desc: "🚚 INFRA: Fetch k8s templates from app-repo"
     cmds:
-      - uv run scripts/fetch-k8s.py "{{.REPO_URL}}@{{.VERSION}}" --cache-dir "{{.K8S_CACHE_DIR}}k8s" ${LOCAL_INFRA_PATH:+--local-path "$LOCAL_INFRA_PATH"}
+      - >- 
+        uv run scripts/fetch-k8s.py "{{.REPO_URL}}@{{.VERSION}}" 
+        --cache-dir "{{.K8S_CACHE_DIR}}" 
+        {{if eq .K8S_ENV "local"}}${LOCAL_INFRA_PATH:+--local-path "$LOCAL_INFRA_PATH"}{{end}}
+
+  infra:clean:
+    desc: "🧹 Clean cache directories"
+    cmds: [rm -rf .cache/]
 
   infra:render:
     desc: "📄 INFRA: Render environment .gotmpl files to rendered-values/"
-    dir: .cache/k8s
+    dir: "{{.K8S_CACHE_DIR}}"
     cmds:
       - mkdir -p ../../environments/{{.K8S_ENV}}/rendered-values
       - "helmfile -e {{.HELMFILE_ENV}} {{.CONFIG_HELMFILE_VALUES}} --skip-deps write-values --output-file-template='../../environments/{{.K8S_ENV}}/rendered-values/{{`{{.Release.Name}}`}}.yaml'"

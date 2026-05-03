@@ -51,7 +51,7 @@ def _download_remote_infra(version: str, repo_url: str, cache_dir: Path):
     
     typer.echo(f"Extracting to {extract_dir}...")
     with tarfile.open(temp_tar, "r:gz") as tar:
-        tar.extractall(path=extract_dir)
+        tar.extractall(path=extract_dir, filter='data')
         
     k8s_src = next((path for path in extract_dir.rglob("*") if path.is_dir() and path.parts[-2:] == ("infra", "k8s")), None)
             
