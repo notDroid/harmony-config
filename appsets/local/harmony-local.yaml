@@ -209,4 +209,11 @@ spec:
           kind: ValidatingWebhookConfiguration
           jqPathExpressions:
             - '.webhooks[]?.clientConfig.caBundle'
+        - group: apps
+          kind: Deployment
+          name: kube-prometheus-stack-grafana
+          jqPathExpressions:
+            - '.spec.template.metadata.annotations."checksum/config"'
+            - '.spec.template.metadata.annotations."checksum/secret"'
+            - '.spec.template.metadata.annotations."checksum/sc-dashboard-provider-config"'
     {{- end }}
