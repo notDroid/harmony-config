@@ -110,24 +110,24 @@ tasks:
 
   tf:init:
     desc: "🌍 TF: Initialize Terragrunt for the target K8S_ENV"
-    dir: infra/terraform/environments/{{.K8S_ENV}}
+    dir: terraform/environments/{{.K8S_ENV}}
     cmds:
       - terragrunt init
 
   tf:plan:
     desc: "🌍 TF: Plan Terragrunt infrastructure for the target K8S_ENV"
-    dir: infra/terraform/environments/{{.K8S_ENV}}
+    dir: terraform/environments/{{.K8S_ENV}}
     cmds:
       - terragrunt plan
 
   tf:apply:
     desc: "🌍 TF: Apply Terragrunt infrastructure for the target K8S_ENV"
-    dir: infra/terraform/environments/{{.K8S_ENV}}
+    dir: terraform/environments/{{.K8S_ENV}}
     cmds:
       - terragrunt apply
   
   tf:destroy:
     desc: "🌍 TF: Destroy Terragrunt infrastructure for the target K8S_ENV"
-    dir: infra/terraform/environments/{{.K8S_ENV}}
+    dir: terraform/environments/{{.K8S_ENV}}
     cmds:
       - terragrunt destroy

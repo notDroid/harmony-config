@@ -7,9 +7,7 @@ terraform {
 }
 
 locals {
-  values = yamldecode(templatefile("${get_repo_root()}/environments/staging/values.yaml", {
-    AWS_ACCOUNT_ID = get_aws_account_id()
-  }))
+  values = yamldecode(templatefile("${get_repo_root()}/environments/staging/values.yaml")
   secrets = yamldecode(sops_decrypt_file("${get_repo_root()}/environments/staging/secrets.yaml"))
   
   env = local.values.environment
