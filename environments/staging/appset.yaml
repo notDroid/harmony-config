@@ -1,0 +1,304 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: harmony-staging
+  namespace: argocd
+spec:
+  goTemplate: true
+  strategy:
+    type: RollingSync
+    rollingSync:
+      steps:
+        - matchExpressions:
+            - key: wave
+              operator: In
+              values:
+                - "w-5"
+        - matchExpressions:
+            - key: wave
+              operator: In
+              values:
+                - "w-4"
+        - matchExpressions:
+            - key: wave
+              operator: In
+              values:
+                - "w-3"
+        - matchExpressions:
+            - key: wave
+              operator: In
+              values:
+                - "w-2"
+        - matchExpressions:
+            - key: wave
+              operator: In
+              values:
+                - "w-1"
+        - matchExpressions:
+            - key: wave
+              operator: In
+              values:
+                - "w0"
+        - matchExpressions:
+            - key: wave
+              operator: In
+              values:
+                - "w1"
+
+  generators:
+    - list:
+        elements:
+          # ==========================================
+          # WAVE -5: Core Cluster Infrastructure
+          # No dependencies on anything else in this
+          # cluster; all can sync in parallel.
+          # ==========================================
+
+          - name: external-secrets
+            wave: "-5"
+            type: external
+            repoURL: https://charts.external-secrets.io
+            chart: external-secrets
+            targetRevision: "2.2.0"
+            namespace: external-secrets
+
+          - name: karpenter-crd
+            wave: "-5"
+            type: external
+            repoURL: oci://public.ecr.aws/karpenter
+            chart: karpenter-crd
+            targetRevision: "1.10.0"
+            namespace: kube-system
+
+          - name: gp3-storage-class
+            wave: "-5"
+            type: local
+            chartPath: infra/k8s/charts/storage-class
+            namespace: kube-system
+
+          - name: reloader
+            wave: "-5"
+            type: external
+            repoURL: https://stakater.github.io/stakater-charts
+            chart: reloader
+            targetRevision: "1.4.0"
+            namespace: kube-system
+
+          - name: metrics-server
+            wave: "-5"
+            type: external
+            repoURL: https://kubernetes-sigs.github.io/metrics-server/
+            chart: metrics-server
+            targetRevision: "3.13.0"
+            namespace: kube-system
+
+          - name: kube-prometheus-stack
+            wave: "-5"
+            type: external
+            repoURL: https://prometheus-community.github.io/helm-charts
+            chart: kube-prometheus-stack
+            targetRevision: "84.5.0"
+            namespace: monitoring
+
+          # ==========================================
+          # WAVE -4: Cluster Autoscaler
+          # Depends on: karpenter-crd (w-5)
+          # ==========================================
+
+          - name: karpenter
+            wave: "-4"
+            type: external
+            repoURL: oci://public.ecr.aws/karpenter
+            chart: karpenter
+            targetRevision: "1.10.0"
+            namespace: kube-system
+
+          # ==========================================
+          # WAVE -3: Autoscaler Provisioner
+          # Depends on: karpenter (w-4)
+          # Creates NodePool + EC2NodeClass objects;
+          # the Karpenter controller must be running
+          # and its webhooks serving before these
+          # custom resources can be validated.
+          # ==========================================
+
+          - name: karpenter-provisioner
+            wave: "-3"
+            type: local
+            chartPath: infra/k8s/charts/karpenter-provisioner
+            namespace: kube-system
+
+          # ==========================================
+          # WAVE -2: Secrets Management
+          # Depends on: external-secrets (w-5)
+          # The secrets chart creates ExternalSecret
+          # CRs that ESO resolves; ESO webhooks must
+          # be healthy before these objects are
+          # admitted (hence three-wave gap from w-5).
+          # ==========================================
+
+          - name: secrets
+            wave: "-2"
+            type: local
+            chartPath: infra/k8s/charts/secrets
+            namespace: harmony
+
+          # ==========================================
+          # WAVE -1: Message Broker
+          # Depends on: secrets (w-2)
+          # automq (kafka) reads credentials from
+          # Secrets resolved in w-2; the broker must
+          # be healthy before any app can publish or
+          # consume messages.
+          # ==========================================
+
+          - name: automq
+            wave: "-1"
+            type: external
+            repoURL: oci://registry-1.docker.io/bitnamicharts/kafka
+            chart: kafka
+            targetRevision: "31.5.0"
+            namespace: harmony
+
+          # ==========================================
+          # WAVE 0: Application Services
+          # Depends on: automq (w-1), secrets (w-2)
+          # None of these services depend on each
+          # other, so they can all sync in parallel.
+          # Note: in remote, postgresql / redis /
+          # dynamodb-local are managed externally
+          # (RDS, ElastiCache, DynamoDB) — no
+          # in-cluster chart dependency needed.
+          # ==========================================
+
+          - name: backend
+            wave: "0"
+            type: local
+            chartPath: infra/k8s/charts/harmony
+            namespace: harmony
+
+          - name: consumer
+            wave: "0"
+            type: local
+            chartPath: infra/k8s/charts/harmony
+            namespace: harmony
+
+          - name: conduit-cdc
+            wave: "0"
+            type: local
+            chartPath: infra/k8s/charts/conduit
+            namespace: harmony
+
+          - name: redpanda-connect
+            wave: "0"
+            type: external
+            repoURL: https://charts.redpanda.com
+            chart: connect
+            targetRevision: "3.1.0"
+            namespace: harmony
+
+          - name: kafbat-ui
+            wave: "0"
+            type: external
+            repoURL: https://kafbat.github.io/helm-charts
+            chart: kafka-ui
+            targetRevision: "1.6.4"
+            namespace: harmony
+
+          # ==========================================
+          # WAVE 1: Runtime-dependent Services
+          # Depends on: backend (w0)
+          # centrifugo validates connection tokens
+          # against backend's auth endpoint at
+          # startup — backend must be healthy first.
+          # ==========================================
+
+          - name: centrifugo
+            wave: "1"
+            type: external
+            repoURL: https://centrifugal.github.io/helm-charts
+            chart: centrifugo
+            targetRevision: "13.1.0"
+            namespace: harmony
+
+  template:
+    metadata:
+      name: "{{ .name }}"
+      namespace: argocd
+      labels:
+        # "w" prefix is required: Kubernetes labels must start with an
+        # alphanumeric character, so bare "-5" etc. are invalid.
+        # The rollingSync matchExpressions above match these "w-5" … "w1" values.
+        wave: "w{{ .wave }}"
+    spec:
+      project: default
+      sources:
+        - repoURL: https://github.com/notDroid/harmony-config.git
+          targetRevision: HEAD
+          ref: values
+
+        - repoURL: '{{ if eq .type "local" }}https://github.com/notDroid/HarmonyChat.git{{ else }}{{ .repoURL }}{{ end }}'
+          targetRevision: '{{ if eq .type "local" }}HEAD{{ else }}{{ .targetRevision }}{{ end }}'
+          path: '{{ if eq .type "local" }}{{ .chartPath }}{{ end }}'
+          chart: '{{ if ne .type "local" }}{{ .chart }}{{ end }}'
+          helm:
+            releaseName: "{{ .name }}"
+            valueFiles:
+              - $values/environments/staging/rendered-values/{{ .name }}.yaml
+
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{ .namespace }}"
+
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        automated:
+          prune: true
+          selfHeal: true
+
+  templatePatch: |
+    {{- if eq .name "kube-prometheus-stack" }}
+    spec:
+      ignoreDifferences:
+        - group: admissionregistration.k8s.io
+          kind: MutatingWebhookConfiguration
+          jqPathExpressions:
+            - '.webhooks[]?.clientConfig.caBundle'
+        - group: admissionregistration.k8s.io
+          kind: ValidatingWebhookConfiguration
+          jqPathExpressions:
+            - '.webhooks[]?.clientConfig.caBundle'
+        - group: apps
+          kind: Deployment
+          name: kube-prometheus-stack-grafana
+          jqPathExpressions:
+            - '.spec.template.metadata.annotations."checksum/config"'
+            - '.spec.template.metadata.annotations."checksum/secret"'
+            - '.spec.template.metadata.annotations."checksum/sc-dashboard-provider-config"'
+    {{- end }}
+    {{- if eq .name "external-secrets" }}
+    spec:
+      ignoreDifferences:
+        - group: admissionregistration.k8s.io
+          kind: MutatingWebhookConfiguration
+          jqPathExpressions:
+            - '.webhooks[]?.clientConfig.caBundle'
+        - group: admissionregistration.k8s.io
+          kind: ValidatingWebhookConfiguration
+          jqPathExpressions:
+            - '.webhooks[]?.clientConfig.caBundle'
+    {{- end }}
+    {{- if eq .name "karpenter" }}
+    spec:
+      ignoreDifferences:
+        - group: admissionregistration.k8s.io
+          kind: MutatingWebhookConfiguration
+          jqPathExpressions:
+            - '.webhooks[]?.clientConfig.caBundle'
+        - group: admissionregistration.k8s.io
+          kind: ValidatingWebhookConfiguration
+          jqPathExpressions:
+            - '.webhooks[]?.clientConfig.caBundle'
+    {{- end }}

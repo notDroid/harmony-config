@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.0.0"
+  required_version = ">= 1.5.0"
   required_providers {
     helm = {
       source  = "hashicorp/helm"
@@ -68,60 +68,14 @@ provider "kubectl" {
   load_config_file       = false
 }
 
-# Install ArgoCD
-resource "helm_release" "argocd" {
-  name             = "argocd"
-  repository       = "https://argoproj.github.io/argo-helm"
-  chart            = "argo-cd"
-  namespace        = "argocd"
-  create_namespace = true
+# Boostrap ArgoCD
+module "argocd" {
+  source = "../../modules/argocd"
 
-  values = [
-    yamlencode({
-      configs = {
-        params = {
-          "applicationsetcontroller.enable.progressive.syncs" = "true"
-        }
-      }
-    })
-  ]
-}
-
-# Bootstrap ArgoCD
-
-# ArgoCD Bootstrap Application
-resource "kubectl_manifest" "argocd_bootstrap" {
-  depends_on = [helm_release.argocd]
-
-  yaml_body = yamlencode({
-    apiVersion = "argoproj.io/v1alpha1"
-    kind       = "Application"
-    metadata = {
-      name      = "root-bootstrap"
-      namespace = "argocd"
-    }
-    spec = {
-      project = "default"
-      source = {
-        repoURL        = "https://github.com/notDroid/harmony-config.git"
-        targetRevision = "main"
-        path           = "environments/local"
-        directory = {
-          include = "appset.yaml"
-        }
-      }
-      destination = {
-        server    = "https://kubernetes.default.svc"
-        namespace = "argocd"
-      }
-      syncPolicy = {
-        automated = {
-          prune    = true
-          selfHeal = true
-        }
-      }
-    }
-  })
+  repo_url = "https://github.com/notDroid/harmony-config.git"
+  target_revision = "main"
+  appset_path = "environments/local"
+  appset_name = "appset.yaml"
 }
 
 output "kubeconfig" {

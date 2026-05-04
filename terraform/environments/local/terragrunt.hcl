@@ -1,3 +1,3 @@
 terraform {
-  source = "."
+  source = "../..//environments/local"
 }
