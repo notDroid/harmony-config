@@ -11,7 +11,9 @@ vars:
     sh: "yq '.version' config.yaml"
 
   K8S_ENV: '{{.K8S_ENV | default "local"}}' # IMPORTANT: set through .env or CLI flag
-  K8S_CACHE_DIR: '.cache/{{.K8S_ENV}}'
+  K8S_CACHE_DIR: '.cache-k8s/{{.K8S_ENV}}'
+  TF_CACHE_DIR: '.cache-terraform/{{.K8S_ENV}}'
+
   CONFIG_HELMFILE_VALUES: >-
     --state-values-file ../../environments/{{.K8S_ENV}}/values.yaml
     --state-values-file ../../environments/{{.K8S_ENV}}/secrets.yaml
@@ -52,6 +54,12 @@ tasks:
   # --------------------------------------------------------------------------
 
   infra:fetch:
+    desc: "🚚 INFRA: Fetch all templates from app-repo"
+    cmds:
+      - task: infra:fetch:k8s
+      - task: infra:fetch:tf
+
+  infra:fetch:k8s:
     desc: "🚚 INFRA: Fetch k8s templates from app-repo"
     cmds:
       - >- 
@@ -59,9 +67,17 @@ tasks:
         --cache-dir "{{.K8S_CACHE_DIR}}" 
         {{if eq .K8S_ENV "local"}}${LOCAL_INFRA_PATH:+--local-path "$LOCAL_INFRA_PATH"}{{end}}
 
+  infra:fetch:tf:
+    desc: "🚚 INFRA: Fetch tf templates from app-repo"
+    cmds:
+      - >- 
+        uv run scripts/fetch-terraform.py "{{.REPO_URL}}@{{.VERSION}}" 
+        --cache-dir "{{.TF_CACHE_DIR}}" 
+        {{if eq .K8S_ENV "local"}}${LOCAL_INFRA_PATH:+--local-path "$LOCAL_INFRA_PATH"}{{end}}
+
   infra:clean:
     desc: "🧹 Clean cache directories"
-    cmds: [rm -rf .cache/]
+    cmds: [rm -rf .cache-k8s/ .cache-terraform/]
 
   infra:render:
     desc: "📄 INFRA: Render environment .gotmpl files to rendered-values/"
@@ -73,36 +89,13 @@ tasks:
   infra:sync:
     desc: "🔄 INFRA: Sync template and generated values"
     cmds:
+      - task: infra:clean
       - task: infra:fetch
       - task: infra:render
 
   # --------------------------------------------------------------------------
   # 3. ARGOCD
   # --------------------------------------------------------------------------
-
-  argocd:install:
-    desc: "🐙 ARGOCD: Install ArgoCD"
-    cmds:
-      - kubectl create namespace argocd || true
-      - kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-      - kubectl rollout status deployment argocd-applicationset-controller -n argocd --timeout=120s
-      - kubectl patch configmap argocd-cmd-params-cm -n argocd --type merge -p '{"data":{"applicationsetcontroller.enable.progressive.syncs":"true"}}'
-      - kubectl rollout restart deployment argocd-applicationset-controller -n argocd
-      - kubectl rollout status deployment argocd-applicationset-controller -n argocd --timeout=120s
-
-  argocd:bootstrap:
-    desc: "🐙 ARGOCD: Apply local bootstrap Application"
-    cmds:
-      - kubectl apply -f environments/local/bootstrap.yaml
-
-  # For now we can use app-repo tasks to do the first half then run the second half here
-  # kind:argocd:setup:
-  #   desc: "🚀 K8S: setup cluster + build + argocd install + bootstrap"
-  #   cmds:
-  #     - task: kind:cluster:create
-  #     - task: image:load:kind
-  #     - task: argocd:install
-  #     - task: argocd:bootstrap
 
   argocd:ui:
     desc: Port-forward ArgoCD UI to localhost:8080

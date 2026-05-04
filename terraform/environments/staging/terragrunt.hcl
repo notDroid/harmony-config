@@ -3,11 +3,12 @@ include "root" {
 }
 
 terraform {
-  source = "../..//environments/staging"
+  source = "../../..//terraform/environments/staging"
+  include_in_copy = [".cache-terraform/**"]
 }
 
 locals {
-  values = yamldecode(templatefile("${get_repo_root()}/environments/staging/values.yaml")
+  values = yamldecode(file("${get_repo_root()}/environments/staging/values.yaml"))
   secrets = yamldecode(sops_decrypt_file("${get_repo_root()}/environments/staging/secrets.yaml"))
   
   env = local.values.environment

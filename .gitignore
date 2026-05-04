@@ -1,3 +1,6 @@
+.cache-k8s/
+.cache-terraform/
+
 # Ignore docker generated files
 docker/config/
 

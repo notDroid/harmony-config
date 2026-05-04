@@ -6,7 +6,7 @@ locals {
   # Load environment-specific values from the shared config directory
   values_path = "${get_repo_root()}/environments/${local.env}/values.yaml"
 
-  values = yamldecode(local.values_path)
+  values = yamldecode(file(local.values_path))
 
   project_name = local.values.project_name
   region       = local.values.infra.aws.region

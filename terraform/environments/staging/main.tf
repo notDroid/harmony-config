@@ -1,6 +1,23 @@
 terraform {
   required_version = ">= 1.5.0"
-  required_providers { aws = { source = "hashicorp/aws", version = "~> 6.0" } }
+  required_providers {
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 3.0"
+    }
+    kubectl = {
+      source  = "gavinbunney/kubectl"
+      version = ">= 1.19.0"
+    }
+    kind = {
+      source  = "tehcyx/kind"
+      version = ">= 0.11.0"
+    }
+    aws = { 
+        source = "hashicorp/aws"
+        version = "~> 6.0" 
+    }
+  }
 }
 
 # Variables mapped from Terragrunt
@@ -39,7 +56,7 @@ data "aws_availability_zones" "available" {
 }
 
 module "networking" {
-  source       = "../../modules/networking"
+  source       = "../../../.cache-terraform/staging/networking"
   vpc_name     = "harmony-${var.environment}-vpc"
   environment  = var.environment
   project_name = var.project_name
@@ -49,7 +66,7 @@ module "networking" {
 }
 
 module "secrets" {
-  source              = "../../modules/secrets"
+  source              = "../../../.cache-terraform/staging/secrets"
   environment         = var.environment
   cluster_name        = var.cluster_name
   secret_manager_name = var.secret_manager_name
@@ -59,7 +76,7 @@ module "secrets" {
 }
 
 module "stateful" {
-  source                     = "../../modules/stateful"
+  source                     = "../../../.cache-terraform/staging/stateful"
   environment                = var.environment
   project_name               = var.project_name
   vpc_id                     = module.networking.vpc_id
@@ -76,7 +93,7 @@ module "stateful" {
 }
 
 module "storage" {
-  source                  = "../../modules/storage"
+  source                  = "../../../.cache-terraform/staging/storage"
   environment             = var.environment
   project_name            = var.project_name
   chat_history_table_name = var.chat_history_table_name
@@ -85,7 +102,7 @@ module "storage" {
 }
 
 module "compute" {
-  source             = "../../modules/compute"
+  source             = "../../../.cache-terraform/staging/compute"
   environment        = var.environment
   project_name       = var.project_name
   vpc_id             = module.networking.vpc_id
@@ -110,10 +127,13 @@ resource "aws_ssm_parameter" "redis_endpoint" {
 ### Bootstrap ArgoCD on the EKS cluster
 locals {
   k8s_auth = {
-    host                   = module.compute.k8s_cluster.endpoint
-    cluster_ca_certificate = module.compute.k8s_cluster.cluster_ca_certificate
-    client_certificate     = module.compute.k8s_cluster.client_certificate
-    client_key             = module.compute.k8s_cluster.client_key
+    host                   = module.compute.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.compute.cluster_certificate_authority_data)
+    exec = {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args        = ["eks", "get-token", "--cluster-name", var.cluster_name]
+    }
   }
 }
 
@@ -125,8 +145,11 @@ provider "helm" {
 provider "kubectl" {
   host                   = local.k8s_auth.host
   cluster_ca_certificate = local.k8s_auth.cluster_ca_certificate
-  client_certificate     = local.k8s_auth.client_certificate
-  client_key             = local.k8s_auth.client_key
+  exec {
+    api_version = local.k8s_auth.exec.api_version
+    command     = local.k8s_auth.exec.command
+    args        = local.k8s_auth.exec.args
+  }
   load_config_file       = false
 }
 
